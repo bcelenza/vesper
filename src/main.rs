@@ -26,21 +26,27 @@ use probes::netmonitor::{SocketAddr, TCPLifetime};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    // Setup tracing.
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
+
+    // Ensure we're running with escalated privileges.
     if unsafe { libc::geteuid() != 0 } {
         error!("You must be root to use eBPF!");
         process::exit(1);
     }
 
+    // Determine which interface to attach.
     let args: Vec<String> = env::args().collect();
     let iface = match args.get(1) {
         Some(val) => val,
         None => "lo",
     };
     println!("Attaching socket to interface {}", iface);
+
+    // Load the BPF probe.
     let mut raw_fds = Vec::new();
     let mut loaded = Loader::load(probe_code()).expect("error loading BPF program");
     for sf in loaded.socket_filters_mut() {
@@ -49,6 +55,7 @@ async fn main() {
         }
     }
 
+    // Monitor for events.
     let event_fut = async {
         println!("{:^21}  →  {:^21} | {:^11}", "src", "dst", "duration");
         while let Some((name, events)) = loaded.events.next().await {
@@ -71,6 +78,8 @@ async fn main() {
             }
         }
     };
+
+    // Monitor for CTRL+C
     let ctrlc_fut = async {
         ctrl_c().await.unwrap();
     };
