@@ -1,16 +1,3 @@
-// This program can be executed by
-// # cargo run --example tcp-lifetime [interface]
-// It reports (saddr, sport, daddr, dport, lifetime) of which established and
-// closed while the program is running.
-
-// Example of execution
-// $ sudo -E cargo run --example tcp-lifetime wlp0s20f3
-// Attaching socket to interface wlp0s20f3
-// Hit Ctrl-C to quit
-//          src           →           dst          |  duration
-// 192.168. 0 . 9 :36940  →   8 . 8 . 8 . 8 :53    |     1303 ms
-//  8 . 8 . 8 . 8 :53     →  192.168. 0 . 9 :36940 |     1304 ms
-
 use futures::stream::StreamExt;
 use std::env;
 use std::process;
@@ -92,6 +79,8 @@ async fn main() {
             println!("");
         }
     }
+
+    // Upon exit, print the connections which are still established.
     let estab: HashMap<(SocketAddr, SocketAddr), u64> =
         HashMap::new(loaded.map("established").unwrap()).unwrap();
     for ((src, dst), _) in estab.iter() {
