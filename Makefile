@@ -6,19 +6,29 @@ RUSTUP=rustup run $(RUST_VERSION)
 install:
 	rustup install $(RUST_VERSION)
 
+.PHONY: clean-probes
+clean-probes:
+	cd probes && $(RUSTUP) cargo clean
+
+.PHONY: clean-agent
+clean-agent:
+	$(RUSTUP) cargo clean
+
 .PHONY: clean
-clean:
-	$(RUSTUP) cargo clean && cd probes && $(RUSTUP) cargo clean
+clean: clean-probes clean-agent
 
 .PHONY: build-probes
 build-probes:
 	cd probes && $(RUSTUP) cargo bpf build --target-dir=../target
 
-build-userspace:
+build-agent:
 	$(RUSTUP) cargo build
 
 .PHONY: build
-build: build-probes build-userspace
+build: build-probes build-agent
+
+.PHONY: release
+release: clean build
 
 .PHONY: run
 run:

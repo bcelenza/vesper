@@ -1,5 +1,7 @@
 # Netmon
 
+A BPF probe and agent for networking telemetry.
+
 ## Prerequisities
 
 * Rust (any version)
@@ -15,7 +17,7 @@ This will install Rust 1.56 so that LLVM 13 is used by both `rustc` and cargo-bp
 
 ## Build and Run
 
-Run `make build` to build both the probe and the userspace binary, or `make build-probe` / `make build-userspace` separately.
+Run `make build` to build both the probe and the agent binary, or `make build-probe` / `make build-agent` separately.
 
 You can run the application with:
 
