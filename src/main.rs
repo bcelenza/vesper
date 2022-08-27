@@ -9,7 +9,7 @@ use tracing_subscriber::FmtSubscriber;
 use redbpf::load::Loader;
 use redbpf::HashMap;
 
-use probes::netmonitor::{SocketAddr, TCPLifetime};
+use probes::netmonitor::{SocketAddr, SocketCloseState, TCPSummary};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -44,18 +44,19 @@ async fn main() {
 
     // Monitor for events.
     let event_fut = async {
-        println!("{:^21}  →  {:^21} | {:^11}", "src", "dst", "duration");
+        println!("{:^21}  →  {:^21} | {:^11} | {}", "src", "dst", "duration", "close_state");
         while let Some((name, events)) = loaded.events.next().await {
             match name.as_str() {
-                "tcp_lifetime" => {
+                "tcp_summary" => {
                     for event in events {
-                        let tcp_lifetime =
-                            unsafe { ptr::read(event.as_ptr() as *const TCPLifetime) };
+                        let tcp_summary =
+                            unsafe { ptr::read(event.as_ptr() as *const TCPSummary) };
                         println!(
-                            "{:21}  →  {:21} | {:>8} ms",
-                            tcp_lifetime.src.to_string(),
-                            tcp_lifetime.dst.to_string(),
-                            tcp_lifetime.duration / 1000 / 1000
+                            "{:21}  →  {:21} | {:>8} ms | {}",
+                            tcp_summary.src.to_string(),
+                            tcp_summary.dst.to_string(),
+                            tcp_summary.duration / 1000 / 1000,
+                            SocketCloseState::from_u64(tcp_summary.close_state),
                         );
                     }
                 }

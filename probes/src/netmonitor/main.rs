@@ -5,13 +5,13 @@ use memoffset::offset_of;
 
 use redbpf_probes::socket_filter::prelude::*;
 
-use probes::netmonitor::{SocketAddr, TCPLifetime};
+use probes::netmonitor::{SocketAddr, TCPSummary};
 
 #[map(link_section = "maps/established")]
 static mut ESTABLISHED: HashMap<(SocketAddr, SocketAddr), u64> = HashMap::with_max_entries(10240);
 
-#[map(link_section = "maps/tcp_lifetime")]
-static mut TCP_LIFETIME: PerfMap<TCPLifetime> = PerfMap::with_max_entries(10240);
+#[map(link_section = "maps/tcp_summary")]
+static mut TCP_SUMMARY: PerfMap<TCPSummary> = PerfMap::with_max_entries(10240);
 
 program!(0xFFFFFFFE, "GPL");
 #[socket_filter]
@@ -59,12 +59,13 @@ fn measure_tcp_lifetime(skb: SkBuff) -> SkBuffResult {
         unsafe {
             if let Some(estab_ts) = ESTABLISHED.get(&pair) {
                 ESTABLISHED.delete(&pair);
-                TCP_LIFETIME.insert(
+                TCP_SUMMARY.insert(
                     skb.skb as *mut __sk_buff,
-                    &TCPLifetime {
+                    &TCPSummary {
                         src,
                         dst,
                         duration: bpf_ktime_get_ns() - estab_ts,
+                        close_state: if tcp_hdr.fin() == 1 { 1 } else { 2 },
                     },
                 );
             }
