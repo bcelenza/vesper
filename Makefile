@@ -1,11 +1,14 @@
 # Using an older version of rust so LLVM 13 is used by both rustc and cargo-bpf
 RUST_VERSION=1.56
 RUSTUP=rustup run $(RUST_VERSION)
-CARGO_HOME=/home/$(USERNAME)
 
 .PHONY: install
 install:
 	rustup install $(RUST_VERSION)
+
+.PHONY: clean
+clean:
+	$(RUSTUP) cargo clean && cd probes && $(RUSTUP) cargo clean
 
 .PHONY: build-probes
 build-probes:
@@ -17,10 +20,6 @@ build-userspace:
 .PHONY: build
 build: build-probes build-userspace
 
-.PHONY: test
-test:
-	$(RUSTUP) cargo test -- --nocapture
-
 .PHONY: run
 run:
-	sudo target/debug/netmon
+	sudo target/debug/netmon $(INTERFACE)

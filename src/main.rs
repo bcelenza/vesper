@@ -1,40 +1,102 @@
+// This program can be executed by
+// # cargo run --example tcp-lifetime [interface]
+// It reports (saddr, sport, daddr, dport, lifetime) of which established and
+// closed while the program is running.
+
+// Example of execution
+// $ sudo -E cargo run --example tcp-lifetime wlp0s20f3
+// Attaching socket to interface wlp0s20f3
+// Hit Ctrl-C to quit
+//          src           →           dst          |  duration
+// 192.168. 0 . 9 :36940  →   8 . 8 . 8 . 8 :53    |     1303 ms
+//  8 . 8 . 8 . 8 :53     →  192.168. 0 . 9 :36940 |     1304 ms
+
 use futures::stream::StreamExt;
-use probes::openmonitor::OpenPath;
-use redbpf::load::Loader;
-use std::{ffi::CStr, ptr};
-use tracing::Level;
+use std::env;
+use std::process;
+use std::ptr;
+use tokio::signal::ctrl_c;
+use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
+
+use redbpf::load::Loader;
+use redbpf::HashMap;
+
+use probes::netmonitor::{SocketAddr, TCPLifetime};
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    if unsafe { libc::geteuid() != 0 } {
+        error!("You must be root to use eBPF!");
+        process::exit(1);
+    }
+
+    let args: Vec<String> = env::args().collect();
+    let iface = match args.get(1) {
+        Some(val) => val,
+        None => "lo",
+    };
+    println!("Attaching socket to interface {}", iface);
+    let mut raw_fds = Vec::new();
+    let mut loaded = Loader::load(probe_code()).expect("error loading BPF program");
+    for sf in loaded.socket_filters_mut() {
+        if let Ok(sock_raw_fd) = sf.attach_socket_filter(iface) {
+            raw_fds.push(sock_raw_fd);
+        }
+    }
+
+    let event_fut = async {
+        println!("{:^21}  →  {:^21} | {:^11}", "src", "dst", "duration");
+        while let Some((name, events)) = loaded.events.next().await {
+            match name.as_str() {
+                "tcp_lifetime" => {
+                    for event in events {
+                        let tcp_lifetime =
+                            unsafe { ptr::read(event.as_ptr() as *const TCPLifetime) };
+                        println!(
+                            "{:21}  →  {:21} | {:>8} ms",
+                            tcp_lifetime.src.to_string(),
+                            tcp_lifetime.dst.to_string(),
+                            tcp_lifetime.duration / 1000 / 1000
+                        );
+                    }
+                }
+                _ => {
+                    error!("unknown event = {}", name);
+                }
+            }
+        }
+    };
+    let ctrlc_fut = async {
+        ctrl_c().await.unwrap();
+    };
+    println!("Hit Ctrl-C to quit");
+    tokio::select! {
+        _ = event_fut => {
+
+        }
+        _ = ctrlc_fut => {
+            println!("");
+        }
+    }
+    let estab: HashMap<(SocketAddr, SocketAddr), u64> =
+        HashMap::new(loaded.map("established").unwrap()).unwrap();
+    for ((src, dst), _) in estab.iter() {
+        println!(
+            "{:<21}  →  {:<21} | still established",
+            src.to_string(),
+            dst.to_string()
+        );
+    }
+}
 
 fn probe_code() -> &'static [u8] {
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/target/bpf/programs/openmonitor/openmonitor.elf"
+        "/target/bpf/programs/netmonitor/netmonitor.elf"
     ))
-}
-
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
-    // setup tracing
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::WARN)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-
-    // load probe
-    let mut loaded = Loader::load(probe_code()).expect("error on Loader::load");
-    let probe = loaded.kprobe_mut("do_sys_open").expect("error on Loaded::kprobe_mut");
-    probe.attach_kprobe("do_sys_open", 0).expect("error on Kprobe::attach_kprobe");
-    probe.attach_kprobe("do_sys_openat2", 0).expect("error on Kprobe::attach_kprobe");
-
-    while let Some((map_name, events)) = loaded.events.next().await {
-        if map_name == "OPEN_PATHS" {
-            for event in events {
-                let open_path = unsafe { ptr::read(event.as_ptr() as *const OpenPath) };
-                unsafe {
-                    let cfilename = CStr::from_ptr(open_path.filename.as_ptr() as *const _);
-                    println!("{}", cfilename.to_string_lossy());
-                };
-            }
-        }
-    }
 }

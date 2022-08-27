@@ -1,3 +1,3 @@
 
 #![no_std]
-pub mod openmonitor;
+pub mod netmonitor;

@@ -5,6 +5,7 @@ edition = '2018'
 
 [dependencies]
 cty = "0.2"
+memoffset = "0.6"
 redbpf-macros = "2.3.0"
 redbpf-probes = "2.3.0"
 
@@ -19,6 +20,6 @@ probes = []
 path = "src/lib.rs"
 
 [[bin]]
-name = "openmonitor"
-path = "src/openmonitor/main.rs"
+name = "netmonitor"
+path = "src/netmonitor/main.rs"
 required-features = ["probes"]
