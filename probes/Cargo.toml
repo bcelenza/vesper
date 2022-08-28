@@ -20,6 +20,6 @@ probes = []
 path = "src/lib.rs"
 
 [[bin]]
-name = "netmonitor"
-path = "src/netmonitor/main.rs"
+name = "network"
+path = "src/network/main.rs"
 required-features = ["probes"]

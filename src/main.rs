@@ -9,7 +9,7 @@ use tracing_subscriber::FmtSubscriber;
 use redbpf::load::Loader;
 use redbpf::HashMap;
 
-use probes::netmonitor::{SocketAddr, SocketCloseState, TCPSummary};
+use probes::network::{SocketAddr, SocketCloseState, TCPSummary};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -96,6 +96,6 @@ async fn main() {
 fn probe_code() -> &'static [u8] {
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/target/bpf/programs/netmonitor/netmonitor.elf"
+        "/target/bpf/programs/network/network.elf"
     ))
 }
