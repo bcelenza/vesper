@@ -44,7 +44,7 @@ async fn main() {
 
     // Monitor for events.
     let event_fut = async {
-        println!("{:^21}  →  {:^21} | {:^11} | {}", "src", "dst", "duration", "close_state");
+        println!("{:^21}  →  {:^21} | {:^11} | close_state", "src", "dst", "duration");
         while let Some((name, events)) = loaded.events.next().await {
             match name.as_str() {
                 "tcp_summary" => {

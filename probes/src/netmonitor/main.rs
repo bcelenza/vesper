@@ -5,7 +5,7 @@ use memoffset::offset_of;
 
 use redbpf_probes::socket_filter::prelude::*;
 
-use probes::netmonitor::{SocketAddr, TCPSummary};
+use probes::netmonitor::{SocketAddr, SocketCloseState, TCPSummary};
 
 #[map(link_section = "maps/established")]
 static mut ESTABLISHED: HashMap<(SocketAddr, SocketAddr), u64> = HashMap::with_max_entries(10240);
@@ -65,7 +65,7 @@ fn measure_tcp_lifetime(skb: SkBuff) -> SkBuffResult {
                         src,
                         dst,
                         duration: bpf_ktime_get_ns() - estab_ts,
-                        close_state: if tcp_hdr.fin() == 1 { 1 } else { 2 },
+                        close_state: if tcp_hdr.fin() == 1 { SocketCloseState::FIN as u64 } else { SocketCloseState::RST as u64 },
                     },
                 );
             }
