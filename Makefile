@@ -1,10 +1,11 @@
 # Using an older version of rust so LLVM 13 is used by both rustc and cargo-bpf
-RUST_VERSION=1.56
+RUST_VERSION=1.59
 RUSTUP=rustup run $(RUST_VERSION)
 
 .PHONY: install
 install:
 	rustup install $(RUST_VERSION)
+	$(RUSTUP) cargo install cargo-bpf --no-default-features --features=llvm13,command-line
 
 .PHONY: clean-probes
 clean-probes:
