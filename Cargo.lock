@@ -416,19 +416,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "netmon"
-version = "0.1.0"
-dependencies = [
- "futures",
- "libc",
- "probes",
- "redbpf",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "nom"
 version = "7.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -974,6 +961,19 @@ name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
+
+[[package]]
+name = "vesper"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "libc",
+ "probes",
+ "redbpf",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "wasi"

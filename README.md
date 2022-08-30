@@ -1,4 +1,4 @@
-# Netmon
+# Vesper
 
 A BPF probe and agent for networking telemetry.
 

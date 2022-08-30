@@ -33,4 +33,4 @@ release: clean build
 
 .PHONY: run
 run:
-	sudo target/debug/netmon $(INTERFACE)
+	sudo target/debug/vesper $(INTERFACE)
