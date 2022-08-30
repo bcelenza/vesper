@@ -1,7 +1,7 @@
 use ::core::fmt;
 use ::core::mem::transmute;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct SocketAddr {
     pub addr: u32,
@@ -35,6 +35,7 @@ impl fmt::Display for SocketCloseState {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct TCPSummary {
     pub src: SocketAddr,
     pub dst: SocketAddr,

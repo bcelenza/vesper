@@ -1,4 +1,5 @@
 use futures::stream::StreamExt;
+use tracing::info;
 use std::env;
 use std::process;
 use std::ptr;
@@ -9,13 +10,13 @@ use tracing_subscriber::FmtSubscriber;
 use redbpf::load::Loader;
 use redbpf::HashMap;
 
-use probes::network::{SocketAddr, SocketCloseState, TCPSummary};
+use probes::network::{SocketAddr, TCPSummary};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Setup tracing.
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::WARN)
+        .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -31,7 +32,7 @@ async fn main() {
         Some(val) => val,
         None => "lo",
     };
-    println!("Attaching socket to interface {}", iface);
+    info!("Attaching socket to interface {}", iface);
 
     // Load the BPF probe.
     let mut raw_fds = Vec::new();
@@ -44,20 +45,13 @@ async fn main() {
 
     // Monitor for events.
     let event_fut = async {
-        println!("{:^21}  →  {:^21} | {:^11} | close_state", "src", "dst", "duration");
         while let Some((name, events)) = loaded.events.next().await {
             match name.as_str() {
                 "tcp_summary" => {
                     for event in events {
                         let tcp_summary =
                             unsafe { ptr::read(event.as_ptr() as *const TCPSummary) };
-                        println!(
-                            "{:21}  →  {:21} | {:>8} ms | {}",
-                            tcp_summary.src.to_string(),
-                            tcp_summary.dst.to_string(),
-                            tcp_summary.duration / 1000 / 1000,
-                            SocketCloseState::from_u64(tcp_summary.close_state),
-                        );
+                        info!("{:?}", tcp_summary);
                     }
                 }
                 _ => {
@@ -71,7 +65,6 @@ async fn main() {
     let ctrlc_fut = async {
         ctrl_c().await.unwrap();
     };
-    println!("Hit Ctrl-C to quit");
     tokio::select! {
         _ = event_fut => {
 
@@ -85,11 +78,8 @@ async fn main() {
     let estab: HashMap<(SocketAddr, SocketAddr), u64> =
         HashMap::new(loaded.map("established").unwrap()).unwrap();
     for ((src, dst), _) in estab.iter() {
-        println!(
-            "{:<21}  →  {:<21} | still established",
-            src.to_string(),
-            dst.to_string()
-        );
+        info!(
+            "Still established: src={:?}, dst={:?}", src, dst);
     }
 }
 
