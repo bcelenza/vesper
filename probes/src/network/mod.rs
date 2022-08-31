@@ -1,5 +1,4 @@
 use ::core::fmt;
-use ::core::mem::transmute;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -55,7 +54,7 @@ impl SocketAddr {
 
 impl fmt::Display for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let octets: [u8; 4] = unsafe { transmute::<u32, [u8; 4]>(self.addr) };
+        let octets: [u8; 4] = self.addr.to_ne_bytes();
 
         write!(
             f,
