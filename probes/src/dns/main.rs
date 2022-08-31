@@ -15,6 +15,7 @@ pub fn filter_dns(ctx: XdpContext) -> XdpResult {
     let transport = ctx.transport()?;
     let data = ctx.data()?;
 
+    // TODO: This is likely over-simplistic given other examples in the wild.
     if transport.source() != 53 && transport.dest() != 53 {
         return Ok(XdpAction::Pass);
     }
