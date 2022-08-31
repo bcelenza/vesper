@@ -18,6 +18,10 @@ clean-agent:
 .PHONY: clean
 clean: clean-probes clean-agent
 
+.PHONY: lint
+lint:
+	$(RUSTUP) cargo clippy
+
 .PHONY: build-probes
 build-probes:
 	cd probes && $(RUSTUP) cargo bpf build --target-dir=../target

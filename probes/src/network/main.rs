@@ -15,7 +15,7 @@ static mut TCP_SUMMARY: PerfMap<TCPSummary> = PerfMap::with_max_entries(10240);
 
 program!(0xFFFFFFFE, "GPL");
 #[socket_filter]
-fn filter_tcp(skb: SkBuff) -> SkBuffResult {
+pub fn filter_tcp(skb: SkBuff) -> SkBuffResult {
     let eth_len = mem::size_of::<ethhdr>();
     let eth_proto = skb.load::<__be16>(offset_of!(ethhdr, h_proto))? as u32;
     if eth_proto != ETH_P_IP {
