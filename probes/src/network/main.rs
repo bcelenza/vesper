@@ -5,7 +5,8 @@ use memoffset::offset_of;
 
 use redbpf_probes::socket_filter::prelude::*;
 
-use probes::network::{SocketAddr, SocketCloseState, TCPSummary};
+use probes::common::SocketAddr;
+use probes::network::{SocketCloseState, TCPSummary};
 
 #[map(link_section = "maps/established")]
 static mut ESTABLISHED: HashMap<(SocketAddr, SocketAddr), u64> = HashMap::with_max_entries(10240);
