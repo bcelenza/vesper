@@ -26,6 +26,7 @@ lint:
 build-probes:
 	cd probes && $(RUSTUP) cargo bpf build --target-dir=../target
 
+.PHONY: build-agent
 build-agent:
 	$(RUSTUP) cargo build
 
