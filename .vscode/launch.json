@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'netmon'",
+            "name": "Debug executable 'vesper'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=netmon",
-                    "--package=netmon"
+                    "--bin=vesper",
+                    "--package=vesper"
                 ],
                 "filter": {
-                    "name": "netmon",
+                    "name": "vesper",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'netmon'",
+            "name": "Debug unit tests in executable 'vesper'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=netmon",
-                    "--package=netmon"
+                    "--bin=vesper",
+                    "--package=vesper"
                 ],
                 "filter": {
-                    "name": "netmon",
+                    "name": "vesper",
                     "kind": "bin"
                 }
             },
