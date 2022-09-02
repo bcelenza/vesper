@@ -1,13 +1,14 @@
-use vesper::listeners::dns_listener::DNSConfig;
-use vesper::listeners::dns_listener::DNSListener;
-use vesper::listeners::network_listener::NetworkConfig;
-use vesper::listeners::network_listener::NetworkListener;
-use vesper::listeners::listener::Listener;
+use caps::{CapSet, Capability};
 use std::env;
 use std::process;
 use tokio::signal::ctrl_c;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
+use vesper::listeners::dns_listener::DNSConfig;
+use vesper::listeners::dns_listener::DNSListener;
+use vesper::listeners::network_listener::NetworkConfig;
+use vesper::listeners::network_listener::NetworkListener;
+use vesper::listeners::listener::Listener;
 
 
 #[tokio::main(flavor = "current_thread")]
@@ -19,9 +20,17 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // Ensure we're running with escalated privileges.
-    if unsafe { libc::geteuid() != 0 } {
-        error!("You must be root to use eBPF!");
-        process::exit(1);
+    match caps::has_cap(None, CapSet::Permitted, Capability::CAP_BPF) {
+        Ok(has_cap) => {
+            if !has_cap {
+                error!("CAP_BPF is required to run this agent.");
+                process::exit(1);
+            }
+        }
+        Err(err) => {
+            error!("Unable to verify necessary linux capabilities: {:?}", err);
+            process::exit(1);
+        }
     }
 
     // Determine which interface to attach.
