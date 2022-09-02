@@ -5,11 +5,11 @@ use memoffset::offset_of;
 
 use redbpf_probes::socket_filter::prelude::*;
 
-use probes::common::SocketAddr;
+use probes::common::{IPv6Address, SocketAddress};
 use probes::network::{SocketCloseState, TCPSummary};
 
 #[map(link_section = "maps/established")]
-static mut ESTABLISHED: HashMap<(SocketAddr, SocketAddr), u64> = HashMap::with_max_entries(10240);
+static mut ESTABLISHED: HashMap<(SocketAddress, SocketAddress), u64> = HashMap::with_max_entries(10240);
 
 #[map(link_section = "maps/tcp_summary")]
 static mut TCP_SUMMARY: PerfMap<TCPSummary> = PerfMap::with_max_entries(10240);
@@ -35,12 +35,12 @@ pub fn filter_tcp(skb: SkBuff) -> SkBuffResult {
     }
 
     let ihl = ip_hdr.ihl() as usize;
-    let src = SocketAddr::new(
-        skb.load::<__be32>(eth_len + offset_of!(iphdr, saddr))?,
+    let src = SocketAddress::new(
+        IPv6Address::from_v4u32(skb.load::<__be32>(eth_len + offset_of!(iphdr, saddr))?),
         skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, source))?,
     );
-    let dst = SocketAddr::new(
-        skb.load::<__be32>(eth_len + offset_of!(iphdr, daddr))?,
+    let dst = SocketAddress::new(
+        IPv6Address::from_v4u32(skb.load::<__be32>(eth_len + offset_of!(iphdr, daddr))?),
         skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, dest))?,
     );
     let pair = (src, dst);
