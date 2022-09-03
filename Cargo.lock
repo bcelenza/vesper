@@ -110,16 +110,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
 
 [[package]]
-name = "caps"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "938c50180feacea622ef3b8f4a496057c868dcf8ac7a64d781dd8f3f51a9c143"
-dependencies = [
- "libc",
- "thiserror",
-]
-
-[[package]]
 name = "cargo-bpf"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1005,7 +995,6 @@ name = "vesper"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "caps",
  "dns-parser",
  "futures",
  "libc",
