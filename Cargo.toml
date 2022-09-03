@@ -10,6 +10,7 @@ members = [
 
 [dependencies]
 async-trait = "0.1.57"
+clap = { version = "3.2.20", features = ["derive"] }
 dns-parser = "0.8.0"
 libc = "0.2.132"
 redbpf = { version = "2.3.0", features = ["load"] }

@@ -38,4 +38,4 @@ release: clean build
 
 .PHONY: run
 run:
-	sudo target/debug/vesper $(INTERFACE)
+	sudo target/debug/vesper -i $(INTERFACE)
