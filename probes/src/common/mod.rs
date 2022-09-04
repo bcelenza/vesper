@@ -45,7 +45,7 @@ impl fmt::Display for IPv6Address {
         if self.is_v4() {
             let upper = self.g.to_be_bytes();
             let lower = self.h.to_be_bytes();
-            write!(f, "{}.{}.{}.{}", upper[0], upper[1], lower[0], lower[1])
+            write!(f, "{}.{}.{}.{}", lower[1], lower[0], upper[1], upper[0])
         } else {
             write!(f, "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
                 self.a, self.b, self.c, self.d,
