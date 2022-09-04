@@ -25,9 +25,8 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    // Determine which interface to attach.
+    // Parse CLI arguments
     let args = CommandArgs::parse();
-    info!("Attaching socket to interface {}", args.interface);
 
     // Ensure we're running with escalated privileges.
     if unsafe { libc::geteuid() != 0 } {
@@ -36,6 +35,7 @@ async fn main() {
     }
 
     // Load the eBPF listeners.
+    info!("Attaching socket to interface {}", args.interface);
     let mut network_listener = NetworkListener::new().expect("could not load network probe");
     network_listener.attach(NetworkConfig{ interface: args.interface.to_owned() }).expect("could not attach network probe to interface");
     let mut dns_listener = DNSListener::new().expect("could not load DNS listener");

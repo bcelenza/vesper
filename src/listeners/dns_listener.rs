@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dns_parser::Packet;
 use futures::StreamExt;
-use redbpf::{load::{Loaded, Loader, LoaderError}, xdp::{self, MapData}};
+use redbpf::{Error, load::{Loaded, Loader, LoaderError}, xdp::{self, MapData}};
 use tracing::{error, info};
 
 use super::listener::Listener;
@@ -26,10 +26,9 @@ impl Listener for DNSListener {
         })
     }
 
-    fn attach(&mut self, config: DNSConfig) -> Result<(), Box<dyn std::error::Error>> {
+    fn attach(&mut self, config: DNSConfig) -> Result<(), Error> {
         for x in self._loaded.xdps_mut() {
-            // TODO: Error handling
-            x.attach_xdp(&config.interface, xdp::Flags::default()).unwrap();
+            x.attach_xdp(&config.interface, xdp::Flags::default())?;
         }
         Ok(())
     }

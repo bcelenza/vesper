@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::StreamExt;
 use probes::network::TCPSummary;
-use redbpf::load::{Loaded, Loader, LoaderError};
+use redbpf::{load::{Loaded, Loader, LoaderError}, Error};
 use std::ptr;
 use tracing::{error, info};
 
@@ -28,13 +28,11 @@ impl Listener for NetworkListener {
     }
 
 
-    fn attach(&mut self, config: NetworkConfig) -> Result<(), Box<dyn std::error::Error>> {
+    fn attach(&mut self, config: NetworkConfig) -> Result<(), Error> {
         let mut fds = Vec::new();
         for filter in self._loaded.socket_filters_mut() {
-            // TODO: Error handling
-            if let Ok(fd) = filter.attach_socket_filter(&config.interface) {
-                fds.push(fd);
-            }
+            let fd = filter.attach_socket_filter(&config.interface)?;
+            fds.push(fd);
         }
         self._file_descriptors = Some(fds);
         Ok(())
