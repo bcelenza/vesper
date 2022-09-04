@@ -2,7 +2,7 @@
 #![no_main]
 
 use redbpf_probes::xdp::prelude::*;
-use probes::{dns::DNSEvent, common::SocketAddr};
+use probes::{dns::DNSEvent, common::IPv6Address, common::SocketAddress};
 
 program!(0xFFFFFFFE, "GPL");
 
@@ -21,8 +21,8 @@ pub fn filter_dns(ctx: XdpContext) -> XdpResult {
     }
 
     let event = DNSEvent {
-        src: SocketAddr::new(ip.saddr, transport.source()),
-        dest: SocketAddr::new(ip.daddr, transport.dest()),
+        src: SocketAddress::new(IPv6Address::from_v4u32(ip.saddr), transport.source()),
+        dest: SocketAddress::new(IPv6Address::from_v4u32(ip.daddr), transport.dest()),
     };
     unsafe {
         events.insert(

@@ -1,6 +1,6 @@
 use core::fmt;
 
-use super::common::SocketAddr;
+use super::common::SocketAddress;
 
 #[derive(Copy, Clone)]
 pub enum SocketCloseState {
@@ -30,8 +30,8 @@ impl fmt::Display for SocketCloseState {
 #[repr(C)]
 #[derive(Debug)]
 pub struct TCPSummary {
-    pub src: SocketAddr,
-    pub dst: SocketAddr,
+    pub src: SocketAddress,
+    pub dst: SocketAddress,
     pub duration: u64,
     pub close_state: u64,
 }
