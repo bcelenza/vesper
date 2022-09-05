@@ -23,7 +23,7 @@ This project is all about getting deeper in the Rust language and exposing mysel
   * JSON logging
   * [CIM](https://www.dmtf.org/standards/cim)-compliant data format
 * Configuration
-  * Ignore traffic from specific sources/destinations (ideally by CIDR)
+  * Ignore traffic from specific sources/destinations (ideally by domain or CIDR)
   * Attach to multiple network interfaces
   * Pick and choose what data to collect
   * Policies for higher-level logging (e.g., TLS version, ciphers)
