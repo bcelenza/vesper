@@ -25,6 +25,8 @@ This project is all about getting deeper in the Rust language and exposing mysel
 * Configuration
   * Ignore traffic from specific sources/destinations (ideally by CIDR)
   * Attach to multiple network interfaces
+  * Pick and choose what data to collect
+  * Policies for higher-level logging (e.g., TLS version, ciphers)
 
 ## Building From Source
 
@@ -42,7 +44,7 @@ This will install Rust 1.59 so that LLVM 13 is used by both `rustc` and cargo-bp
 
 ### Build and Run
 
-Run `make build` to build both the probe and the agent binary, or `make build-probe` / `make build-agent` separately.
+Run `make build` to build both the probe and the agent binary, or `make build-probes` / `make build-agent` separately.
 
 You can run the application with:
 
