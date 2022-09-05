@@ -7,7 +7,7 @@ use super::common::SocketAddress;
 /// of UNKNOWN, which maps to the highest value (a reserved
 /// number).
 /// See: https://en.wikipedia.org/wiki/List_of_IP_protocol_numbers.
-#[repr(u64)]
+#[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Protocol {
     ICMP = 0x01,
@@ -31,7 +31,7 @@ impl Protocol {
 }
 
 /// The classification of the traffic, e.g., DNS.
-#[repr(u64)]
+#[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum TrafficClass {
     UNCLASSIFIED = 0,
