@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use dns_parser::Packet;
 use futures::StreamExt;
-use probes::network::PacketMetadata;
+use probes::network::{PacketMetadata, TrafficClass};
 use redbpf::{Error, load::{Loaded, Loader, LoaderError}, xdp::{self, MapData}};
 use tracing::{error, info};
 
@@ -25,7 +25,6 @@ impl Listener for NetworkListener {
         })
     }
 
-
     fn attach(&mut self, config: NetworkConfig) -> Result<(), Error> {
         for x in self._loaded.xdps_mut() {
             x.attach_xdp(&config.interface, xdp::Flags::default())?;
@@ -36,19 +35,18 @@ impl Listener for NetworkListener {
     async fn listen(&mut self) {
         while let Some((name, events)) = self._loaded.events.next().await {
             match name.as_str() {
-                "dns_data" => {
+                "message" => {
                     for event in events {
-                        let metadata = unsafe { &*(event.as_ptr() as *const MapData<PacketMetadata>) };
-                        match Packet::parse(metadata.payload()) {
-                            Ok(packet) => { info!("DNS metadata={} data={:?}", metadata.data(), packet) },
-                            Err(err) => { error!("Could not parse DNS packet: {:?}", err) },
-                        };
-                    }
-                }
-                "packet_metadata" => {
-                    for event in events {
-                        let metadata = unsafe { &*(event.as_ptr() as *const MapData<PacketMetadata>) };
-                        info!("metadata={}", metadata.data());
+                        let message = unsafe { &*(event.as_ptr() as *const MapData<PacketMetadata>) };
+                        let metadata = message.data();
+                        if TrafficClass::from_u64(metadata.class) == TrafficClass::DNS && metadata.has_payload == 1 {
+                            match Packet::parse(message.payload()) {
+                                Ok(packet) => { info!("metadata={} data={:?}", metadata, packet) },
+                                Err(err) => { error!("Could not parse DNS packet: err={:?}, metadata={}", err, metadata) },
+                            };
+                        } else {
+                            info!("metadata={}", metadata);
+                        }
                     }
                 }
                 _ => {
