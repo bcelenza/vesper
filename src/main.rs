@@ -3,8 +3,6 @@ use std::process;
 use tokio::signal::ctrl_c;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
-use vesper::listeners::dns_listener::DNSConfig;
-use vesper::listeners::dns_listener::DNSListener;
 use vesper::listeners::network_listener::NetworkConfig;
 use vesper::listeners::network_listener::NetworkListener;
 use vesper::listeners::listener::Listener;
@@ -35,11 +33,9 @@ async fn main() {
     }
 
     // Load the eBPF listeners.
-    info!("Attaching socket to interface {}", args.interface);
     let mut network_listener = NetworkListener::new().expect("could not load network probe");
+    info!("Attaching socket to interface {}", args.interface);
     network_listener.attach(NetworkConfig{ interface: args.interface.to_owned() }).expect("could not attach network probe to interface");
-    let mut dns_listener = DNSListener::new().expect("could not load DNS listener");
-    dns_listener.attach(DNSConfig { interface: args.interface.to_owned() }).expect("could not attach DNS listener");
 
     // Monitor for CTRL+C.
     let ctrlc_fut = async {
@@ -47,7 +43,6 @@ async fn main() {
     };
     tokio::select! {
         _ = network_listener.listen() => {}
-        _ = dns_listener.listen() => {}
         _ = ctrlc_fut => {
             println!("");
         }

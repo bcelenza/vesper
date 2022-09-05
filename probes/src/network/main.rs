@@ -1,77 +1,50 @@
 #![no_std]
 #![no_main]
-use core::mem::{self, MaybeUninit};
-use memoffset::offset_of;
 
-use redbpf_probes::socket_filter::prelude::*;
-
-use probes::common::{IPv6Address, SocketAddress};
-use probes::network::{SocketCloseState, TCPSummary};
-
-#[map(link_section = "maps/established")]
-static mut ESTABLISHED: HashMap<(SocketAddress, SocketAddress), u64> = HashMap::with_max_entries(10240);
-
-#[map(link_section = "maps/tcp_summary")]
-static mut TCP_SUMMARY: PerfMap<TCPSummary> = PerfMap::with_max_entries(10240);
+use probes::common::{SocketAddress, IPv6Address};
+use probes::network::{PacketMetadata, TrafficClass};
+use redbpf_probes::xdp::prelude::*;
+use redbpf_probes::xdp::{XdpContext, XdpAction};
 
 program!(0xFFFFFFFE, "GPL");
-#[socket_filter]
-pub fn filter_tcp(skb: SkBuff) -> SkBuffResult {
-    let eth_len = mem::size_of::<ethhdr>();
-    let eth_proto = skb.load::<__be16>(offset_of!(ethhdr, h_proto))? as u32;
-    if eth_proto != ETH_P_IP {
-        return Ok(SkBuffAction::Ignore);
+
+/// A map that contains metadata and optional payload for packets.
+#[map(link_section = "maps/message")]
+static mut messages: PerfMap<PacketMetadata> = PerfMap::with_max_entries(10240);
+
+/// Filter packets from the network, categorizing 
+#[xdp]
+pub fn filter_network(ctx: XdpContext) -> XdpResult {
+    let ip = unsafe { *ctx.ip()? };
+    let transport = ctx.transport()?;
+    let data = ctx.data()?;
+
+    let mut class = TrafficClass::UNCLASSIFIED;
+    let mut pass_payload = false;
+
+    // If the packet is DNS, add packet information for user space.
+    // TODO: This is likely over-simplistic given other examples in the wild.
+    if transport.source() == 53 || transport.dest() == 53 {
+        class = TrafficClass::DNS;
+        pass_payload = true;                
     }
 
-    let ip_proto = skb.load::<__u8>(eth_len + offset_of!(iphdr, protocol))? as u32;
-    if ip_proto != IPPROTO_TCP {
-        return Ok(SkBuffAction::Ignore);
-    }
+    let metadata = PacketMetadata::new(
+        SocketAddress::new(IPv6Address::from_v4u32(ip.saddr), transport.source()),
+        SocketAddress::new(IPv6Address::from_v4u32(ip.daddr), transport.dest()),
+        ip.protocol as u64,
+        data.len(),
+        class as u64, 
+        pass_payload);
 
-    let mut ip_hdr = unsafe { MaybeUninit::<iphdr>::zeroed().assume_init() };
-    ip_hdr._bitfield_1 = __BindgenBitfieldUnit::new([skb.load::<u8>(eth_len)?]);
-    if ip_hdr.version() != 4 {
-        return Ok(SkBuffAction::Ignore);
-    }
+    unsafe {
+        let map_data = if pass_payload {
+            MapData::with_payload(metadata, data.offset() as u32, ctx.len() as u32)
+        } else {
+            MapData::new(metadata)
+        };
+        messages.insert(&ctx, &map_data);
+    }                
 
-    let ihl = ip_hdr.ihl() as usize;
-    let src = SocketAddress::new(
-        IPv6Address::from_v4u32(skb.load::<__be32>(eth_len + offset_of!(iphdr, saddr))?),
-        skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, source))?,
-    );
-    let dst = SocketAddress::new(
-        IPv6Address::from_v4u32(skb.load::<__be32>(eth_len + offset_of!(iphdr, daddr))?),
-        skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, dest))?,
-    );
-    let pair = (src, dst);
-    let mut tcp_hdr = unsafe { MaybeUninit::<tcphdr>::zeroed().assume_init() };
-    tcp_hdr._bitfield_1 = __BindgenBitfieldUnit::new([
-        skb.load::<u8>(eth_len + ihl * 4 + offset_of!(tcphdr, _bitfield_1))?,
-        skb.load::<u8>(eth_len + ihl * 4 + offset_of!(tcphdr, _bitfield_1) + 1)?,
-    ]);
-
-    if tcp_hdr.syn() == 1 {
-        unsafe {
-            ESTABLISHED.set(&pair, &bpf_ktime_get_ns());
-        }
-    }
-
-    if tcp_hdr.fin() == 1 || tcp_hdr.rst() == 1 {
-        unsafe {
-            if let Some(estab_ts) = ESTABLISHED.get(&pair) {
-                ESTABLISHED.delete(&pair);
-                TCP_SUMMARY.insert(
-                    skb.skb as *mut __sk_buff,
-                    &TCPSummary {
-                        src,
-                        dst,
-                        duration: bpf_ktime_get_ns() - estab_ts,
-                        close_state: if tcp_hdr.fin() == 1 { SocketCloseState::FIN as u64 } else { SocketCloseState::RST as u64 },
-                    },
-                );
-            }
-        }
-    }
-
-    Ok(SkBuffAction::Ignore)
+    Ok(XdpAction::Pass)
 }

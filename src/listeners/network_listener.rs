@@ -1,15 +1,14 @@
 use async_trait::async_trait;
+use dns_parser::Packet;
 use futures::StreamExt;
-use probes::network::TCPSummary;
-use redbpf::{load::{Loaded, Loader, LoaderError}, Error};
-use std::ptr;
+use probes::network::{PacketMetadata, TrafficClass};
+use redbpf::{Error, load::{Loaded, Loader, LoaderError}, xdp::{self, MapData}};
 use tracing::{error, info};
 
 use super::listener::Listener;
 
 pub struct NetworkListener {
     _loaded: Loaded,
-    _file_descriptors: Option<Vec<i32>>,
 }
 pub struct NetworkConfig {
     pub interface: String,
@@ -23,33 +22,35 @@ impl Listener for NetworkListener {
         let loaded = Loader::load(bytecode())?;
         Ok(NetworkListener {
             _loaded: loaded,
-            _file_descriptors: None,
         })
     }
 
-
     fn attach(&mut self, config: NetworkConfig) -> Result<(), Error> {
-        let mut fds = Vec::new();
-        for filter in self._loaded.socket_filters_mut() {
-            let fd = filter.attach_socket_filter(&config.interface)?;
-            fds.push(fd);
+        for x in self._loaded.xdps_mut() {
+            x.attach_xdp(&config.interface, xdp::Flags::default())?;
         }
-        self._file_descriptors = Some(fds);
         Ok(())
     }
 
     async fn listen(&mut self) {
         while let Some((name, events)) = self._loaded.events.next().await {
             match name.as_str() {
-                "tcp_summary" => {
+                "message" => {
                     for event in events {
-                        let tcp_summary =
-                            unsafe { ptr::read(event.as_ptr() as *const TCPSummary) };
-                        info!("{:?}", tcp_summary);
+                        let message = unsafe { &*(event.as_ptr() as *const MapData<PacketMetadata>) };
+                        let metadata = message.data();
+                        if TrafficClass::from_u64(metadata.class) == TrafficClass::DNS && metadata.has_payload == 1 {
+                            match Packet::parse(message.payload()) {
+                                Ok(packet) => { info!("metadata={} data={:?}", metadata, packet) },
+                                Err(err) => { error!("Could not parse DNS packet: err={:?}, metadata={}", err, metadata) },
+                            };
+                        } else {
+                            info!("metadata={}", metadata);
+                        }
                     }
                 }
                 _ => {
-                    error!("unknown tcp event = {}", name);
+                    error!("unknown network event = {}", name);
                 }
             }
         }
