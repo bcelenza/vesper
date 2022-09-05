@@ -33,8 +33,19 @@ build-agent:
 .PHONY: build
 build: build-probes build-agent
 
+.PHONY: test-agent
+test-agent:
+	$(RUSTUP) cargo test
+
+.PHONY: test-probes
+test-probes:
+	cd probes && $(RUSTUP) cargo test
+
+.PHONY: test
+test: test-probes test-agent
+
 .PHONY: release
-release: clean build
+release: clean test build
 
 .PHONY: run
 run:

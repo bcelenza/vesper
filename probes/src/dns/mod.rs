@@ -1,8 +1,8 @@
-use crate::common::SocketAddr;
+use crate::common::SocketAddress;
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct DNSEvent {
-    pub src: SocketAddr,
-    pub dest: SocketAddr,
+    pub src: SocketAddress,
+    pub dest: SocketAddress,
 }
