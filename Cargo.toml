@@ -13,8 +13,9 @@ async-trait = "0.1.57"
 clap = { version = "3.2.20", features = ["derive"] }
 dns-parser = "0.8.0"
 libc = "0.2.132"
+mio = "0.8.4"
 redbpf = { version = "2.3.0", features = ["load"] }
-tokio = { version = "1.0", features = ["rt", "signal", "time", "io-util", "net", "sync"] }
+tokio = { version = "1.21.0", features = ["full"] }
 tracing-subscriber = "0.2"
 tracing = "0.1"
 futures = "0.3"

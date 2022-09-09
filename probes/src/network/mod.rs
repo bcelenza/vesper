@@ -32,7 +32,7 @@ impl Protocol {
 
 /// The classification of the traffic, e.g., DNS.
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TrafficClass {
     UNCLASSIFIED = 0,
     DNS = 1,
@@ -55,8 +55,6 @@ pub struct PacketMetadata {
     pub dest: SocketAddress,
     pub length: usize,
     pub protocol: u64,
-    pub class: u64,
-    pub has_payload: u64,
 }
 
 impl fmt::Display for PacketMetadata {
@@ -65,23 +63,19 @@ impl fmt::Display for PacketMetadata {
         self.src.fmt(f)?;
         write!(f, ", dest=")?;
         self.dest.fmt(f)?;
-        write!(f, ", protocol={:?}, length={}, class={:?}, has_payload={} }}", 
+        write!(f, ", protocol={:?}, length={} }}", 
             Protocol::from_u64(self.protocol), 
-            self.length,
-            TrafficClass::from_u64(self.class),
-            self.has_payload)
+            self.length)
     }
 }
 
 impl PacketMetadata {
-    pub fn new(src: SocketAddress, dest: SocketAddress, protocol: u64, length: usize, class: u64, has_payload: bool) -> Self {
+    pub fn new(src: SocketAddress, dest: SocketAddress, protocol: u64, length: usize) -> Self {
         PacketMetadata { 
             src,
             dest,
             length,
             protocol,
-            class,
-            has_payload: if has_payload { 1 } else { 0 },
         }
     }
 }

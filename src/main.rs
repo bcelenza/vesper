@@ -3,9 +3,9 @@ use std::process;
 use tokio::signal::ctrl_c;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
-use vesper::listeners::network_listener::NetworkConfig;
-use vesper::listeners::network_listener::NetworkListener;
-use vesper::listeners::listener::Listener;
+use vesper::listeners::network::NetworkConfig;
+use vesper::listeners::network::NetworkListener;
+use vesper::listeners::Listener;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
