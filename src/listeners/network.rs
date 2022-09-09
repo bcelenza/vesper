@@ -1,7 +1,8 @@
 use std::{os::unix::prelude::FromRawFd, io::{Read, ErrorKind}};
 
 use async_trait::async_trait;
-use dns_parser::Packet;
+use dns_parser::{Packet as DnsPacket};
+use etherparse::SlicedPacket;
 use mio::{Poll, Events, net::UnixStream, Token, Interest};
 use redbpf::{Error, load::{Loaded, Loader, LoaderError}};
 use tracing::{error, info};
@@ -54,6 +55,7 @@ impl Listener for NetworkListener {
 
         loop {
             if let Err(e) = poll.poll(&mut events, None) {
+                // Catch CTRL+C interrupts and exit the loop
                 if e.kind() == ErrorKind::Interrupted {
                     return Ok(());
                 } else {
@@ -63,11 +65,27 @@ impl Listener for NetworkListener {
             }
 
             for _ in &events {
+                // Read raw bytes to the buffer from the stream.
                 let mut buffer: Vec<u8> = Vec::with_capacity(64 * 1024);
                 stream.read_to_end(&mut buffer);
 
-                match Packet::parse(&buffer[42..]) {
-                    Ok(packet) => info!("DNS packet: {:?}", packet),
+                // Parse the packet contents starting with the Ethernet header.
+                let parsed = SlicedPacket::from_ethernet(&buffer);
+                if parsed.is_err() {
+                    error!("Could not parse packet: {} (packetLen={})", parsed.unwrap_err(), buffer.len());
+                    continue;
+                }
+
+                // Determine how to route the packet for processing.
+                let packet = parsed.unwrap();
+                if packet.transport.is_none() {
+                    error!("Could not process packet: no transport specified");
+                    continue;
+                }
+
+
+                match DnsPacket::parse(packet.payload) {
+                    Ok(packet) => info!("DNS: {:?}", packet),
                     Err(e) => error!("Could not parse DNS packet: {}", e)
                 }
             }
