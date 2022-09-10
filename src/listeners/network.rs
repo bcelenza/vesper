@@ -1,11 +1,13 @@
 use std::{os::unix::prelude::FromRawFd, io::{Read, ErrorKind}};
 
 use async_trait::async_trait;
-use dns_parser::{Packet as DnsPacket};
 use etherparse::SlicedPacket;
+use etherparse::TransportSlice::{Tcp, Udp};
 use mio::{Poll, Events, net::UnixStream, Token, Interest};
-use redbpf::{Error, load::{Loaded, Loader, LoaderError}};
-use tracing::{error, info};
+use redbpf::{Error as BpfError, load::{Loaded, Loader, LoaderError}};
+use tracing::error;
+
+use crate::{processors::{dns::DnsProcessor, PacketProcessor}};
 
 use super::{Listener, ListenerError};
 
@@ -29,7 +31,7 @@ impl Listener for NetworkListener {
         })
     }
 
-    fn attach(&mut self, config: NetworkConfig) -> Result<(), Error> {
+    fn attach(&mut self, config: NetworkConfig) -> Result<(), BpfError> {
         let mut fds: Vec<i32> = Vec::new();
         for filter in self._loaded.socket_filters_mut() {
             let fd = filter.attach_socket_filter(&config.interface)?;
@@ -67,7 +69,12 @@ impl Listener for NetworkListener {
             for _ in &events {
                 // Read raw bytes to the buffer from the stream.
                 let mut buffer: Vec<u8> = Vec::with_capacity(64 * 1024);
-                stream.read_to_end(&mut buffer);
+                if let Err(e) = stream.read_to_end(&mut buffer) {
+                    // EAGAIN expected since stream is non-blocking
+                    if e.kind() != ErrorKind::WouldBlock {
+                        error!("Could not read from stream: {}", e);
+                    }
+                }
 
                 // Parse the packet contents starting with the Ethernet header.
                 let parsed = SlicedPacket::from_ethernet(&buffer);
@@ -83,10 +90,23 @@ impl Listener for NetworkListener {
                     continue;
                 }
 
-
-                match DnsPacket::parse(packet.payload) {
-                    Ok(packet) => info!("DNS: {:?}", packet),
-                    Err(e) => error!("Could not parse DNS packet: {}", e)
+                let transport = packet.transport.as_ref().unwrap();
+                match transport {
+                    Udp(udp) => {
+                        if udp.source_port() == 53 || udp.destination_port() == 53 {
+                            if let Err(e) = DnsProcessor::process(&packet) {
+                                error!("Could not process packet: {}", e);
+                            }
+                        }
+                    },
+                    Tcp(tcp) => {
+                        if tcp.source_port() == 53 || tcp.destination_port() == 53 {
+                            if let Err(e) = DnsProcessor::process(&packet) {
+                                error!("Could not process packet: {}", e);
+                            }
+                        }
+                    }
+                    _ => error!("Unhandled transport: {:?}", transport),
                 }
             }
         }

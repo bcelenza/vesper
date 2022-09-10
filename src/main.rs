@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::io;
 use std::process;
 use tokio::signal::ctrl_c;
 use tracing::{error, info, Level};
@@ -20,6 +21,7 @@ async fn main() {
     // Setup tracing.
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
+        .with_writer(io::stderr)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
