@@ -24,7 +24,16 @@ impl fmt::Display for EventError<'_> {
 #[derive(Debug, Serialize)]
 pub enum Event {
     DnsQuery(QueryEvent),
-    DnsAnswer(AnswerEvent)
+    DnsResponse(AnswerEvent)
+}
+
+impl Event {
+    pub fn get_type(&self) -> String {
+        match self {
+            Self::DnsQuery(_) => String::from("DnsQuery"),
+            Self::DnsResponse(_) => String::from("DnsResponse"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -36,6 +45,7 @@ pub struct SocketAddress {
 #[derive(Debug, Serialize)]
 struct LogEvent {
     time: String,
+    r#type: String,
     event: Event,
 }
 
@@ -46,6 +56,7 @@ impl Logger {
         let now: DateTime<Utc> = SystemTime::now().into();
         let log_event = LogEvent {
             time: now.to_rfc3339(),
+            r#type: event.get_type(),
             event,
         };
         println!("{}", serde_json::to_string(&log_event)?);

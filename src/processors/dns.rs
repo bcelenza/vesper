@@ -15,7 +15,7 @@ impl PacketProcessor for DnsProcessor {
         if dns_packet.header.query {
             Logger::log_event(Event::DnsQuery(QueryEvent::from_packet(packet, &dns_packet)?))?;
         } else {
-            Logger::log_event(Event::DnsAnswer(AnswerEvent::from_packet(packet, &dns_packet)?))?;
+            Logger::log_event(Event::DnsResponse(AnswerEvent::from_packet(packet, &dns_packet)?))?;
         }
         Ok(())
     }

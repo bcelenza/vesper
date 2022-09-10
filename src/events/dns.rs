@@ -107,6 +107,7 @@ pub struct Answer {
 pub struct QueryEvent {
     source: SocketAddress,
     destination: SocketAddress,
+    id: u16,
     questions: Vec<Question>,
 }
 
@@ -125,6 +126,7 @@ impl QueryEvent {
         let event = QueryEvent { 
             source: SocketAddress { ip: source_ip, port: source_port}, 
             destination: SocketAddress { ip: dest_ip, port: dest_port}, 
+            id: dns_packet.header.id,
             questions: dns_packet.questions.iter().map(|q| 
                 Question { r#type: QuestionType::from(&q.qtype), name: q.qname.to_string() }
             ).collect(),
@@ -138,6 +140,7 @@ impl QueryEvent {
 pub struct AnswerEvent {
     source: SocketAddress,
     destination: SocketAddress,
+    id: u16,
     status: String,
     authoritative: bool,
     recursive: bool,
@@ -156,7 +159,7 @@ fn record_value(d: &dns_parser::RData) -> String {
         dns_parser::RData::TXT(r) => String::from_utf8(r.iter().flat_map(|i| i.to_vec()).collect()).unwrap(),
         dns_parser::RData::AAAA(r) => r.0.to_string(),
         dns_parser::RData::SRV(r) => r.target.to_string() +  ":" + &r.port.to_string(),
-        dns_parser::RData::Unknown(_) => String::from("UKNOWN"),
+        dns_parser::RData::Unknown(_) => String::from(""),
     }
 }
 
@@ -175,6 +178,7 @@ impl AnswerEvent {
         let event = AnswerEvent {
             source: SocketAddress { ip: source_ip, port: source_port}, 
             destination: SocketAddress { ip: dest_ip, port: dest_port}, 
+            id: dns_packet.header.id,
             status: dns_packet.header.response_code.to_string(),
             authoritative: dns_packet.header.authoritative, 
             recursive: dns_packet.header.recursion_available, 
