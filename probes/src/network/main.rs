@@ -36,24 +36,12 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
     }
 
     let ihl = ip_hdr.ihl() as usize;
-    let src = SocketAddress::new(
-        IPv6Address::from_v4u32(skb.load::<__be32>(eth_len + offset_of!(iphdr, saddr))?),
-        skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, source))?,
-    );
-    let dst = SocketAddress::new(
-        IPv6Address::from_v4u32(skb.load::<__be32>(eth_len + offset_of!(iphdr, daddr))?),
-        skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, dest))?,
-    );
 
-    if ip_proto == IPPROTO_TCP {
-        let mut tcp_hdr = unsafe { MaybeUninit::<tcphdr>::zeroed().assume_init() };
-        tcp_hdr._bitfield_1 = __BindgenBitfieldUnit::new([
-            skb.load::<u8>(eth_len + ihl * 4 + offset_of!(tcphdr, _bitfield_1))?,
-            skb.load::<u8>(eth_len + ihl * 4 + offset_of!(tcphdr, _bitfield_1) + 1)?,
-        ]);
-    }
+    // Note: TCP and UDP ports are at the same offsets (bytes 0-1, 2-3 in the header)
+    let src_port = skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, source))?;
+    let dest_port = skb.load::<__be16>(eth_len + ihl * 4 + offset_of!(tcphdr, dest))?;
 
-    if ip_proto == IPPROTO_UDP && (src.port == 53 || dst.port == 53) {
+    if src_port == 53 || dest_port == 53 {
         return Ok(SkBuffAction::SendToUserspace);
     }
 
