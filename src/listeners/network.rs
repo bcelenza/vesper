@@ -1,11 +1,13 @@
-use std::{os::unix::prelude::FromRawFd, io::{Read, ErrorKind}};
+use std::{os::unix::prelude::FromRawFd, io::{Read, ErrorKind}, ptr};
 
 use async_trait::async_trait;
 use etherparse::SlicedPacket;
-use etherparse::TransportSlice::{Tcp, Udp};
-use mio::{Poll, Events, net::UnixStream, Token, Interest};
+use futures::StreamExt;
+use mio::net::UnixStream;
 use redbpf::{Error as BpfError, load::{Loaded, Loader, LoaderError}};
-use tracing::error;
+use tracing::{error, debug};
+
+use probes::network::{PacketMetadata, TrafficClass};
 
 use crate::{processors::{dns::DnsProcessor, PacketProcessor}};
 
@@ -42,74 +44,61 @@ impl Listener for NetworkListener {
         Ok(())
     }
 
-    async fn listen(&self) -> Result<(), ListenerError> {
+    async fn listen(&mut self) -> Result<(), ListenerError> {
+        // Open the unix socket as a stream
         let mut stream = unsafe { UnixStream::from_raw_fd(self._fds[0]) };
-        let mut poll = match Poll::new() {
-            Ok(poll) => poll,
-            Err(_) => return Err(ListenerError),
-        };
-        let mut events = Events::with_capacity(1024);
 
-        if poll.registry().register(&mut stream, Token(0), Interest::READABLE).is_err() {
-            return Err(ListenerError)
-        }
+        // Process incoming events
+        // TODO: It seems completely plausible that the listener may pick up an event from a map
+        // before the probe has written all bytes to the socket for a classified packet.
+        while let Some((name, events)) = self._loaded.events.next().await {
+            match name.as_str() {
+                "packet_metadata" => {
+                    for event in events {
+                        let metadata = unsafe { ptr::read(event.as_ptr() as *const PacketMetadata) };
+                        debug!("Received packet metadata: {:?}", metadata);
 
-
-        loop {
-            if let Err(e) = poll.poll(&mut events, None) {
-                // Catch CTRL+C interrupts and exit the loop
-                if e.kind() == ErrorKind::Interrupted {
-                    return Ok(());
-                } else {
-                    error!("Could not poll for events: {}", e);
-                    continue;
-                }
-            }
-
-            for _ in &events {
-                // Read raw bytes to the buffer from the stream.
-                let mut buffer: Vec<u8> = Vec::with_capacity(64 * 1024);
-                if let Err(e) = stream.read_to_end(&mut buffer) {
-                    // EAGAIN expected since stream is non-blocking
-                    if e.kind() != ErrorKind::WouldBlock {
-                        error!("Could not read from stream: {}", e);
-                    }
-                }
-
-                // Parse the packet contents starting with the Ethernet header.
-                let parsed = SlicedPacket::from_ethernet(&buffer);
-                if parsed.is_err() {
-                    error!("Could not parse packet: {} (packetLen={})", parsed.unwrap_err(), buffer.len());
-                    continue;
-                }
-
-                // Determine how to route the packet for processing.
-                let packet = parsed.unwrap();
-                if packet.transport.is_none() {
-                    error!("Could not process packet: no transport specified");
-                    continue;
-                }
-
-                let transport = packet.transport.as_ref().unwrap();
-                match transport {
-                    Udp(udp) => {
-                        if udp.source_port() == 53 || udp.destination_port() == 53 {
-                            if let Err(e) = DnsProcessor::process(&packet) {
-                                error!("Could not process packet: {}", e);
+                        // If the packet was classified, read the payload from the socket and
+                        // pass it off to the appropriate processor.
+                        let class = TrafficClass::from_u64(metadata.class);
+                        if class != TrafficClass::UNCLASSIFIED {
+                            // Read raw bytes to the buffer from the stream.
+                            let mut buffer: Vec<u8> = vec![0; metadata.length];
+                            if let Err(e) = stream.read_exact(&mut buffer) {
+                                // EAGAIN expected since stream is non-blocking
+                                if e.kind() != ErrorKind::WouldBlock {
+                                    error!("Could not read from stream: {}", e);
+                                    continue;
+                                }
                             }
-                        }
-                    },
-                    Tcp(tcp) => {
-                        if tcp.source_port() == 53 || tcp.destination_port() == 53 {
-                            if let Err(e) = DnsProcessor::process(&packet) {
-                                error!("Could not process packet: {}", e);
+
+                            // Parse the packet contents starting with the Ethernet header.
+                            let parsed = SlicedPacket::from_ethernet(&buffer);
+                            if parsed.is_err() {
+                                error!("Could not parse packet: {}", parsed.unwrap_err());
+                                continue;
+                            }
+
+                            // Determine how to route the packet for processing.
+                            let packet = parsed.unwrap();
+                            match class {
+                                TrafficClass::DNS => {
+                                    if let Err(e) = DnsProcessor::process(&packet) {
+                                        error!("Cold not process DNS packet: {}", e);
+                                    }
+                                },
+                                _ => error!("Unhandled traffic class: {:?}", class)
                             }
                         }
                     }
-                    _ => error!("Unhandled transport: {:?}", transport),
-                }
+                },
+                _ => {
+                    error!("Unknown probe event: {}", name);
+                },
             }
         }
+        
+        Ok(())
     }
 }
 

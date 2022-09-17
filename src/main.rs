@@ -18,15 +18,15 @@ struct CommandArgs {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    // Parse CLI arguments
+    let args = CommandArgs::parse();
+
     // Setup tracing.
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_writer(io::stderr)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-
-    // Parse CLI arguments
-    let args = CommandArgs::parse();
 
     // Ensure we're running with escalated privileges.
     if unsafe { libc::geteuid() != 0 } {

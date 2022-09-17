@@ -12,5 +12,5 @@ pub trait Listener {
 
     fn new() -> Result<Self, LoaderError> where Self: std::marker::Sized;
     fn attach(&mut self, config: Self::Config) -> Result<(), Error>;
-    async fn listen(&self) -> Result<(), ListenerError>;
+    async fn listen(&mut self) -> Result<(), ListenerError>;
 }

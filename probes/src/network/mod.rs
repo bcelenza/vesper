@@ -10,7 +10,6 @@ use super::common::SocketAddress;
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Protocol {
-    ICMP = 0x01,
     UDP = 0x06,
     TCP = 0x11,
     UNKNOWN = 0xFF,
@@ -22,7 +21,6 @@ impl Protocol {
     /// See: https://en.wikipedia.org/wiki/List_of_IP_protocol_numbers.
     pub fn from_u64(p: u64) -> Self {
         match p {
-            0x01 => Protocol::ICMP,
             0x06 => Protocol::TCP,
             0x11 => Protocol::UDP,
             _ => Protocol::UNKNOWN
@@ -46,6 +44,13 @@ impl TrafficClass {
             _ => TrafficClass::UNCLASSIFIED
         }
     }
+
+    pub fn to_u64(&self) -> u64 {
+        match self {
+            TrafficClass::UNCLASSIFIED => 0,
+            TrafficClass::DNS => 1,
+        }
+    }
 }
 
 #[repr(C)]
@@ -55,6 +60,7 @@ pub struct PacketMetadata {
     pub dest: SocketAddress,
     pub length: usize,
     pub protocol: u64,
+    pub class: u64,
 }
 
 impl fmt::Display for PacketMetadata {
@@ -70,12 +76,13 @@ impl fmt::Display for PacketMetadata {
 }
 
 impl PacketMetadata {
-    pub fn new(src: SocketAddress, dest: SocketAddress, protocol: u64, length: usize) -> Self {
+    pub fn new(src: SocketAddress, dest: SocketAddress, length: usize, protocol: u64, class: u64) -> Self {
         PacketMetadata { 
             src,
             dest,
             length,
             protocol,
+            class,
         }
     }
 }
