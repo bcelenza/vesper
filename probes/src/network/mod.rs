@@ -1,5 +1,3 @@
-use core::fmt;
-
 use super::common::SocketAddress;
 
 /// The IP protocol (e.g., TCP) of a given packet.
@@ -64,18 +62,6 @@ pub struct PacketMetadata {
     pub length: usize,
     pub protocol: u64,
     pub class: u64,
-}
-
-impl fmt::Display for PacketMetadata {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ src=")?;
-        self.src.fmt(f)?;
-        write!(f, ", dest=")?;
-        self.dest.fmt(f)?;
-        write!(f, ", protocol={:?}, length={} }}", 
-            Protocol::from_u64(self.protocol), 
-            self.length)
-    }
 }
 
 impl PacketMetadata {
