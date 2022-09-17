@@ -9,7 +9,7 @@ use tracing::{error, debug};
 
 use probes::network::{PacketMetadata, TrafficClass};
 
-use crate::{processors::{dns::DnsProcessor, PacketProcessor}};
+use crate::{processors::{dns::DnsProcessor, PacketProcessor, tls::TlsProcessor}};
 
 use super::{Listener, ListenerError};
 
@@ -85,6 +85,11 @@ impl Listener for NetworkListener {
                                 TrafficClass::DNS => {
                                     if let Err(e) = DnsProcessor::process(&packet) {
                                         error!("Cold not process DNS packet: {}", e);
+                                    }
+                                },
+                                TrafficClass::TLS => {
+                                    if let Err(e) = TlsProcessor::process(&packet) {
+                                        error!("Could not process TLS packet: {}", e);
                                     }
                                 },
                                 _ => error!("Unhandled traffic class: {:?}", class)

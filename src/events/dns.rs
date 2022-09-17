@@ -1,10 +1,8 @@
 use dns_parser::Packet as DnsPacket;
 use etherparse::SlicedPacket;
-use etherparse::InternetSlice::{Ipv4, Ipv6};
-use etherparse::TransportSlice::{Tcp, Udp};
 use serde::Serialize;
 
-use super::{SocketAddress, EventError};
+use super::{SocketAddress, EventError, SocketPair};
 
 #[derive(Debug, Serialize)]
 pub enum QuestionType {
@@ -113,19 +111,11 @@ pub struct QueryEvent {
 
 impl QueryEvent {
     pub fn from_packet<'a>(ether_packet: &SlicedPacket, dns_packet: &DnsPacket) -> Result<Self, EventError<'a>> {
-        let (source_ip, dest_ip) = match ether_packet.ip.as_ref().unwrap() {
-            Ipv4(h, _) => (h.source_addr().to_string(), h.destination_addr().to_string()),
-            Ipv6(h, _) => (h.source_addr().to_string(), h.destination_addr().to_string()),
-        };
-        let (source_port, dest_port) = match ether_packet.transport.as_ref().unwrap() {
-            Udp(h) => (h.source_port(), h.destination_port()),
-            Tcp(h) => (h.source_port(), h.destination_port()),
-            _ => return Err(EventError::TranslationError("Unrecognized packet transport"))
-        };
+        let socket_pair = SocketPair::from_packet(ether_packet)?;
 
         let event = QueryEvent { 
-            source: SocketAddress { ip: source_ip, port: source_port}, 
-            destination: SocketAddress { ip: dest_ip, port: dest_port}, 
+            source: SocketAddress { ip: socket_pair.source.ip, port: socket_pair.source.port }, 
+            destination: SocketAddress { ip: socket_pair.destination.ip, port: socket_pair.destination.port }, 
             id: dns_packet.header.id,
             questions: dns_packet.questions.iter().map(|q| 
                 Question { r#type: QuestionType::from(&q.qtype), name: q.qname.to_string() }
@@ -165,19 +155,10 @@ fn record_value(d: &dns_parser::RData) -> String {
 
 impl AnswerEvent {
     pub fn from_packet<'a>(ether_packet: &SlicedPacket, dns_packet: &DnsPacket) -> Result<Self, EventError<'a>> {
-        let (source_ip, dest_ip) = match ether_packet.ip.as_ref().unwrap() {
-            Ipv4(h, _) => (h.source_addr().to_string(), h.destination_addr().to_string()),
-            Ipv6(h, _) => (h.source_addr().to_string(), h.destination_addr().to_string()),
-        };
-        let (source_port, dest_port) = match ether_packet.transport.as_ref().unwrap() {
-            Udp(h) => (h.source_port(), h.destination_port()),
-            Tcp(h) => (h.source_port(), h.destination_port()),
-            _ => return Err(EventError::TranslationError("Unrecognized packet transport"))
-        };
-
+        let socket_pair = SocketPair::from_packet(ether_packet)?;
         let event = AnswerEvent {
-            source: SocketAddress { ip: source_ip, port: source_port}, 
-            destination: SocketAddress { ip: dest_ip, port: dest_port}, 
+            source: SocketAddress { ip: socket_pair.source.ip, port: socket_pair.source.port }, 
+            destination: SocketAddress { ip: socket_pair.destination.ip, port: socket_pair.destination.port }, 
             id: dns_packet.header.id,
             status: dns_packet.header.response_code.to_string(),
             authoritative: dns_packet.header.authoritative, 

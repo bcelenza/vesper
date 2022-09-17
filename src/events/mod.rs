@@ -1,12 +1,17 @@
 use std::{fmt, time::SystemTime};
 
 use chrono::{DateTime, Utc};
+use etherparse::SlicedPacket;
+use etherparse::InternetSlice::{Ipv4, Ipv6};
+use etherparse::TransportSlice::{Tcp, Udp};
 use serde::Serialize;
 use serde_json::Error;
 
-use self::dns::{QueryEvent, AnswerEvent};
+use self::tls::ServerHelloEvent;
+use self::{dns::{QueryEvent, AnswerEvent}, tls::ClientHelloEvent};
 
 pub mod dns;
+pub mod tls;
 
 #[derive(Debug)]
 pub enum EventError<'a> {
@@ -24,7 +29,9 @@ impl fmt::Display for EventError<'_> {
 #[derive(Debug, Serialize)]
 pub enum Event {
     DnsQuery(QueryEvent),
-    DnsResponse(AnswerEvent)
+    DnsResponse(AnswerEvent),
+    TlsClientHello(ClientHelloEvent),
+    TlsServerHello(ServerHelloEvent),
 }
 
 impl Event {
@@ -32,6 +39,8 @@ impl Event {
         match self {
             Self::DnsQuery(_) => String::from("DnsQuery"),
             Self::DnsResponse(_) => String::from("DnsResponse"),
+            Self::TlsClientHello(_) => String::from("TlsClientHello"),
+            Self::TlsServerHello(_) => String::from("TlsSeverHello"),
         }
     }
 }
@@ -40,6 +49,29 @@ impl Event {
 pub struct SocketAddress {
     ip: String,
     port: u16,
+}
+
+pub struct SocketPair {
+    source: SocketAddress,
+    destination: SocketAddress,
+}
+
+impl SocketPair {
+    pub fn from_packet<'a>(packet: &SlicedPacket) -> Result<SocketPair, EventError<'a>> {
+        let (source_ip, dest_ip) = match packet.ip.as_ref().unwrap() {
+            Ipv4(h, _) => (h.source_addr().to_string(), h.destination_addr().to_string()),
+            Ipv6(h, _) => (h.source_addr().to_string(), h.destination_addr().to_string()),
+        };
+        let (source_port, dest_port) = match packet.transport.as_ref().unwrap() {
+            Udp(h) => (h.source_port(), h.destination_port()),
+            Tcp(h) => (h.source_port(), h.destination_port()),
+            _ => return Err(EventError::TranslationError("Unrecognized packet transport"))
+        };
+        Ok(SocketPair {
+            source: SocketAddress { ip: source_ip, port: source_port },
+            destination: SocketAddress { ip: dest_ip, port: dest_port },
+        })
+    }
 }
 
 #[derive(Debug, Serialize)]

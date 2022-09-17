@@ -34,6 +34,7 @@ impl Protocol {
 pub enum TrafficClass {
     UNCLASSIFIED = 0,
     DNS = 1,
+    TLS = 2,
 }
 
 impl TrafficClass {
@@ -41,6 +42,7 @@ impl TrafficClass {
     pub fn from_u64(c: u64) -> Self {
         match c {
             1 => TrafficClass::DNS,
+            2 => TrafficClass::TLS,
             _ => TrafficClass::UNCLASSIFIED
         }
     }
@@ -49,6 +51,7 @@ impl TrafficClass {
         match self {
             TrafficClass::UNCLASSIFIED => 0,
             TrafficClass::DNS => 1,
+            TrafficClass::TLS => 2,
         }
     }
 }
