@@ -86,7 +86,7 @@ pub struct AlertEvent {
 fn cipher_to_string(id: &TlsCipherSuiteID) -> String {
     match TlsCipherSuite::from_id(id.0) {
         Some(c) => String::from(c.name),
-        None => format!("UNKNOWN ({:x})", id.0),
+        None => format!("UNKNOWN (0x{:x})", id.0),
     }
     
 }
