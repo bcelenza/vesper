@@ -30,13 +30,13 @@ async fn main() {
 
     // Ensure we're running with escalated privileges.
     if unsafe { libc::geteuid() != 0 } {
-        error!("You must be root to use eBPF!");
+        error!("You must be root to use vesper!");
         process::exit(1);
     }
 
     // Load the eBPF listeners.
     let mut network_listener = NetworkListener::new().expect("could not load network probe");
-    info!("Attaching socket to interface {}", args.interface);
+    info!("Attaching to network interface {}", args.interface);
     network_listener.attach(NetworkConfig{ interface: args.interface.to_owned() }).expect("could not attach network probe to interface");
 
     // Monitor for CTRL+C.

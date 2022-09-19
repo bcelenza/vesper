@@ -55,7 +55,7 @@ impl TrafficClass {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct PacketMetadata {
     pub src: SocketAddress,
     pub dest: SocketAddress,

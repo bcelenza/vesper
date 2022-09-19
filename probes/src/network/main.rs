@@ -10,9 +10,9 @@ use probes::network::{PacketMetadata, Protocol, TrafficClass};
 program!(0xFFFFFFFE, "GPL");
 
 /// Packet Metadata contains information about packets transiting the network.
-/// This is used in user space for further packet processing and (future, #5) flow stats.
+/// This is used in user space for further packet processing.
 #[map(link_section = "maps/packet_metadata")]
-static mut PACKET_METADATA: PerfMap<PacketMetadata> = PerfMap::with_max_entries(10240);
+static mut PACKET_METADATA: HashMap<u16, PacketMetadata> = HashMap::with_max_entries(1024);
 
 /// Filter packets from the network, categorizing 
 #[socket_filter]
@@ -37,14 +37,15 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
     let mut ip_hdr = unsafe { MaybeUninit::<iphdr>::zeroed().assume_init() };
     ip_hdr._bitfield_1 = __BindgenBitfieldUnit::new([skb.load::<u8>(eth_hdr_len)?]);
 
+    let ip_id = skb.load::<__u16>(eth_hdr_len + offset_of!(iphdr, id))?;
+
     // TODO: Actual IPv6 support
     if ip_hdr.version() != 4 {
         return Ok(SkBuffAction::Ignore);
     }
 
-    let ip_hdr_len = ((skb.load::<u8>(eth_hdr_len)? & 0x0F) << 2) as usize;
-
     // Note: TCP and UDP ports are at the same offsets (bytes 0-1, 2-3 in the header)
+    let ip_hdr_len = ((skb.load::<u8>(eth_hdr_len)? & 0x0F) << 2) as usize;
     let src = SocketAddress::new(
         IPv6Address::from_v4u32(skb.load::<__be32>(eth_hdr_len + offset_of!(iphdr, saddr))?),
         skb.load::<__be16>(eth_hdr_len + ip_hdr_len + offset_of!(tcphdr, source))?,
@@ -75,22 +76,24 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
             class = TrafficClass::TLS;
         }
     }
-    
-
+   
     // Add the packet metadata to the map for user space.
-    unsafe {
-        PACKET_METADATA.insert(skb.skb as *mut __sk_buff, &PacketMetadata::new(
-            src,
-            dst,
-            (*skb.skb).len as usize,
-            raw_ip_proto,
-            class.to_u64(),
-        ));
-    }
-
-    // If the traffic was classified, send to user space for processing.
     if class != TrafficClass::UNCLASSIFIED {
-        return Ok(SkBuffAction::SendToUserspace);
+        unsafe {
+            let metadata = PacketMetadata::new(
+                src,
+                dst,
+                (*skb.skb).len as usize,
+                raw_ip_proto,
+                class.to_u64(),
+            );
+
+            // TODO: Come up with a more unique key. This will eventually collide, even though
+            // the user space program is keeping up in most cases.
+            // Probably a 5-tuple of (src_ip, src_port, dst_ip, dst_port, ip id).
+            PACKET_METADATA.set(&ip_id, &metadata);
+            return Ok(SkBuffAction::SendToUserspace);
+        }
     }
 
     Ok(SkBuffAction::Ignore)
