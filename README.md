@@ -64,7 +64,7 @@ Vesper can provide information about what DNS queries have been made from the ho
 
 #### TLS Negotiation
 
-Vesper monitors all TCP traffic to look for packet signatures that match TLS negotiations. It current provides information for the TLS [Client Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.2) and [Server Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.3) events. If you have a specific compliance need for TLS and cipher usage (e.g., TLS 1.2 only with FIPS 140-2 ciphers), Vesper can monitor and report on what's actually being used:
+Vesper monitors all TCP traffic to look for packet signatures that match TLS negotiations. It currently provides information for the TLS [Client Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.2) and [Server Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.3) events. If you have a specific compliance need for TLS and cipher usage (e.g., TLS 1.2 only with FIPS 140-2 ciphers), Vesper can monitor and report on what's actually being used:
 
 ```
 # TLS client hello made by the host
@@ -77,7 +77,23 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
             "destination":{"ip":"35.186.227.140","port":443},
             "version":"TLSv1_2",
             "ciphers":[
-                "TLS_AES_128_GCM_SHA256","TLS_CHACHA20_POLY1305_SHA256","TLS_AES_256_GCM_SHA384","TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256","TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256","TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256","TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384","TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA","TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA","TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA","TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA","TLS_RSA_WITH_AES_128_GCM_SHA256","TLS_RSA_WITH_AES_256_GCM_SHA384","TLS_RSA_WITH_AES_128_CBC_SHA","TLS_RSA_WITH_AES_256_CBC_SHA"
+                "TLS_AES_128_GCM_SHA256",
+                "TLS_CHACHA20_POLY1305_SHA256",
+                "TLS_AES_256_GCM_SHA384",
+                "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+                "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+                "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+                "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
+                "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+                "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+                "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
+                "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
+                "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+                "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+                "TLS_RSA_WITH_AES_128_GCM_SHA256",
+                "TLS_RSA_WITH_AES_256_GCM_SHA384",
+                "TLS_RSA_WITH_AES_128_CBC_SHA",
+                "TLS_RSA_WITH_AES_256_CBC_SHA"
             ]
         }
     }
