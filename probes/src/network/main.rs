@@ -17,6 +17,8 @@ static mut PACKET_METADATA: HashMap<u16, PacketMetadata> = HashMap::with_max_ent
 /// Filter packets from the network, categorizing 
 #[socket_filter]
 pub fn filter_network(skb: SkBuff) -> SkBuffResult {
+    let packet_size = unsafe { (*skb.skb).len as usize };
+
     // We'll need the ethernet header length to determine offsets down the line.
     let eth_hdr_len = mem::size_of::<ethhdr>();
 
@@ -64,9 +66,9 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
         // Maybe TLS?
         // compute the start of the TLS payload
         let tcp_len = ((skb.load::<u8>(eth_hdr_len + ip_hdr_len as usize + 12)? >> 4) << 2) as usize;
-        let tls = eth_hdr_len + ip_hdr_len + tcp_len;
-        let content_type: u8 = skb.load(tls)?;
-        let record_version: u16 = skb.load(tls + 1)?;
+        let tls_start = eth_hdr_len + ip_hdr_len + tcp_len;
+        let content_type: u8 = skb.load(tls_start)?;
+        let record_version: u16 = skb.load(tls_start + 1)?;
         if content_type == 0x16 
             // Record version should be one of:
             // SSLv3 (0x0300), TLS 1.0 (0x0301), TLS 1.1 (0x0302), TLS 1.2 (0x0303), TLS 1.3 (0x0304)
@@ -83,7 +85,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
             let metadata = PacketMetadata::new(
                 src,
                 dst,
-                (*skb.skb).len as usize,
+                packet_size,
                 raw_ip_proto,
                 class.to_u64(),
             );

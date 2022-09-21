@@ -1,6 +1,6 @@
 use etherparse::SlicedPacket;
 use serde::Serialize;
-use tls_parser::{TlsClientHelloContents, TlsCipherSuite, TlsServerHelloContents, TlsCipherSuiteID};
+use tls_parser::{parse_tls_extensions, TlsClientHelloContents, TlsCipherSuite, TlsServerHelloContents, TlsCipherSuiteID};
 
 use super::{SocketAddress, EventError, SocketPair};
 
@@ -28,16 +28,41 @@ impl From<tls_parser::TlsVersion> for TlsVersion {
 }
 
 #[derive(Debug, Serialize)]
+pub enum TlsExtension {
+    ServerNameIndication(Vec<String>),
+}
+
+#[derive(Debug, Serialize)]
 pub struct ClientHelloEvent {
     source: SocketAddress,
     destination: SocketAddress,
     version: TlsVersion,
     ciphers: Vec<String>,
+    extensions: Vec<TlsExtension>,
 }
 
 impl ClientHelloEvent {
     pub fn from<'a>(packet: &SlicedPacket, t: &TlsClientHelloContents) -> Result<Self, EventError<'a>> {
         let socket_pair = SocketPair::from_packet(packet)?;
+        let mut extensions: Vec<TlsExtension> = Vec::new();
+        if t.ext.is_some() {
+            let ext = parse_tls_extensions(t.ext.unwrap());
+            if ext.is_err() {
+                return Err(EventError::TranslationError("Could not parse TLS extensions"))
+            }
+            extensions = ext.unwrap().1.iter().flat_map(|e| {
+                match e {
+                    tls_parser::TlsExtension::SNI(sni) => {
+                        let names: Vec<String> = sni.iter().map(|s| {
+                            let name = String::from_utf8(s.1.to_vec());
+                            name.unwrap()
+                        }).collect();
+                        Some(TlsExtension::ServerNameIndication(names))
+                    },
+                    _ => None,
+                }
+            }).collect();
+        }
         Ok(ClientHelloEvent { 
             source: socket_pair.source, 
             destination: socket_pair.destination,
@@ -45,6 +70,7 @@ impl ClientHelloEvent {
             ciphers: t.ciphers.iter()
                 .map(cipher_to_string)
                 .collect(),
+            extensions,
         })      
     }
 }
