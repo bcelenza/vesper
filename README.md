@@ -88,6 +88,9 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
                 "TLS_RSA_WITH_AES_256_GCM_SHA384",
                 "TLS_RSA_WITH_AES_128_CBC_SHA",
                 "TLS_RSA_WITH_AES_256_CBC_SHA"
+            ],
+            "extensions":[
+                { "ServerNameIndicator": ["foo.bar.com"] },
             ]
         }
     }
