@@ -1,18 +1,12 @@
+_This project is an educational endeavor and is not intended to be production ready. Interested in using this? [Let me know](mailto:bcelenza@gmail.com).
+
 # Vesper
 
 A security-focused telemetry agent written in Rust using [eBPF](https://ebpf.io/).
 
-__Important__: While public, this project is an educational endeavor and is not meant to be deployed to a production environment.
-
-## Why?
-
-This project is all about getting deeper in the Rust language and exposing myself to eBPF. It's purely for educational purposes.
-
 ## What's provided?
 
-The goal of vesper is to provide _transparency_ around what a host is doing, who it's talking to, and how it's talking. 
-
-Have you ever wondered what DNS requests your applications or the underlying host daemons were making, or what version of TLS or specific ciphers were being negotiated? Vesper's aim is to provide that information and more. Vesper will _not_ take action against any information it finds -- it's sole goal is to report information in a way that another agent or system could consume for enforcement and alerting.
+The goal of vesper is to provide _transparency_ around what a host is doing, who it's talking to, and how it's communicating. 
 
 ### Examples
 
@@ -99,7 +93,7 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
     }
 }
 
-# TLS server hello made by the remote server
+# TLS server hello made by the remote host
 {
     "time":"2022-09-19T14:41:24.896369601+00:00",
     "type":"TlsSeverHello",
