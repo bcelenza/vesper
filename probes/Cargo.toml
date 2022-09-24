@@ -6,11 +6,11 @@ edition = '2018'
 [dependencies]
 cty = "0.2"
 memoffset = "0.6"
-redbpf-macros = "2.3.0"
-redbpf-probes = "2.3.0"
+redbpf-macros = { git = "https://github.com/bcelenza/redbpf.git", package = "redbpf-macros" }
+redbpf-probes = { git = "https://github.com/bcelenza/redbpf.git", package = "redbpf-probes" }
 
 [build-dependencies]
-cargo-bpf = { version = "2.3.0", default-features = false }
+cargo-bpf = { git = "https://github.com/bcelenza/redbpf.git", package = "cargo-bpf", default-features = false }
 
 [features]
 default = []
