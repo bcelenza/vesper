@@ -40,7 +40,7 @@ impl Event {
             Self::DnsQuery(_) => String::from("DnsQuery"),
             Self::DnsResponse(_) => String::from("DnsResponse"),
             Self::TlsClientHello(_) => String::from("TlsClientHello"),
-            Self::TlsServerHello(_) => String::from("TlsSeverHello"),
+            Self::TlsServerHello(_) => String::from("TlsServerHello"),
         }
     }
 }

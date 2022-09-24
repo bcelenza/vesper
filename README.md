@@ -99,7 +99,7 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
 // TLS server hello made by the remote host
 {
     "time":"2022-09-19T14:41:24.896369601+00:00",
-    "type":"TlsSeverHello",
+    "type":"TlsServerHello",
     "event":{
         "TlsServerHello":{
             "source":{"ip":"35.186.227.140","port":443},
