@@ -3,7 +3,7 @@
 
 use core::mem::{self, MaybeUninit};
 use memoffset::offset_of;
-use probes::common::{SocketAddress, IPv6Address};
+use probes::{common::{IPv6Address, SocketAddress, SocketPair}, network::ExpectedTcpFrame};
 use redbpf_probes::socket_filter::prelude::*;
 use probes::network::{PacketMetadata, Protocol, TrafficClass};
 
@@ -13,6 +13,12 @@ program!(0xFFFFFFFE, "GPL");
 /// This is used in user space for further packet processing.
 #[map(link_section = "maps/packet_metadata")]
 static mut PACKET_METADATA: HashMap<u16, PacketMetadata> = HashMap::with_max_entries(1024);
+
+/// Expected TCP frames contains information about what TCP segment to expect next
+/// in the event an application message (e.g., TLS) is split across multiple TCP segments.
+// TODO: This will likely contain orphans due to false positive packet signature matches. Sweeper?
+#[map(link_section = "maps/expected_tcp_frames")]
+static mut EXPECTED_TCP_FRAMES: HashMap<SocketPair, ExpectedTcpFrame> = HashMap::with_max_entries(1024);
 
 /// Filter packets from the network, categorizing 
 #[socket_filter]
@@ -38,44 +44,93 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
 
     let mut ip_hdr = unsafe { MaybeUninit::<iphdr>::zeroed().assume_init() };
     ip_hdr._bitfield_1 = __BindgenBitfieldUnit::new([skb.load::<u8>(eth_hdr_len)?]);
-
-    let ip_id = skb.load::<__u16>(eth_hdr_len + offset_of!(iphdr, id))?;
-
     // TODO: Actual IPv6 support
     if ip_hdr.version() != 4 {
         return Ok(SkBuffAction::Ignore);
     }
 
-    // Note: TCP and UDP ports are at the same offsets (bytes 0-1, 2-3 in the header)
     let ip_hdr_len = ((skb.load::<u8>(eth_hdr_len)? & 0x0F) << 2) as usize;
+    let ip_total_len = skb.load::<__u16>(eth_hdr_len + offset_of!(iphdr, tot_len))?;
+    let ip_id = skb.load::<__u16>(eth_hdr_len + offset_of!(iphdr, id))?;
+
+    // Note: TCP and UDP ports are at the same offsets (bytes 0-1, 2-3 in the header)
     let src = SocketAddress::new(
         IPv6Address::from_v4u32(skb.load::<__be32>(eth_hdr_len + offset_of!(iphdr, saddr))?),
         skb.load::<__be16>(eth_hdr_len + ip_hdr_len + offset_of!(tcphdr, source))?,
     );
-    let dst = SocketAddress::new(
+    let dest = SocketAddress::new(
         IPv6Address::from_v4u32(skb.load::<__be32>(eth_hdr_len + offset_of!(iphdr, daddr))?),
         skb.load::<__be16>(eth_hdr_len + ip_hdr_len + offset_of!(tcphdr, dest))?,
     );
 
     // Attempt to classify the traffic
     let mut class: TrafficClass = TrafficClass::UNCLASSIFIED;
+
     // TODO: Doesn't account for DNS over other ports, overly simplistic.
-    if src.port == 53 || dst.port == 53 {
+    if src.port == 53 || dest.port == 53 {
         class = TrafficClass::DNS;
     } else {
-        // Maybe TLS?
-        // compute the start of the TLS payload
-        let tcp_len = ((skb.load::<u8>(eth_hdr_len + ip_hdr_len as usize + 12)? >> 4) << 2) as usize;
-        let tls_start = eth_hdr_len + ip_hdr_len + tcp_len;
-        let content_type: u8 = skb.load(tls_start)?;
-        let record_version: u16 = skb.load(tls_start + 1)?;
-        if content_type == 0x16 
-            // Record version should be one of:
-            // SSLv3 (0x0300), TLS 1.0 (0x0301), TLS 1.1 (0x0302), TLS 1.2 (0x0303), TLS 1.3 (0x0304)
-            // Note: During Client Hello, version is always specified as 0x0301.
-            && (record_version == 0x0300 || record_version == 0x0301 || record_version == 0x0302 || record_version == 0x0303 || record_version == 0x0304) 
-        {
-            class = TrafficClass::TLS;
+        if ip_proto == Protocol::TCP {
+            let socket_pair = SocketPair{src, dest};
+            let tcp_hdr_len = ((skb.load::<u8>(eth_hdr_len + ip_hdr_len as usize + 12)? >> 4) << 2) as u16;
+            let tcp_data_len = ip_total_len - ip_hdr_len as u16 - tcp_hdr_len;
+            let seq_num: u32 = skb.load(eth_hdr_len + ip_hdr_len + offset_of!(tcphdr, seq))?;
+            // If we're expecting this sequence number, we can optimistically classify.
+            if let Some(expected_frame) = unsafe { EXPECTED_TCP_FRAMES.get(&socket_pair) } {
+                if seq_num == expected_frame.next_sequence {
+                    // If we were expecting this sequence number, we know its class.
+                    class = TrafficClass::from_u64(expected_frame.class);
+
+                    // Are we still expecting more?
+                    let needed = expected_frame.payload_bytes_needed - tcp_data_len;
+                    if needed > 0 {
+                        // Replace the expected frame with the next one.
+                        unsafe {
+                            EXPECTED_TCP_FRAMES.set(&socket_pair, &ExpectedTcpFrame{
+                                payload_bytes_needed: needed,
+                                next_sequence: seq_num + tcp_data_len as u32,
+                                class: expected_frame.class,
+                            });
+                        }
+                    } else {
+                        // No more needed, drop the expectation
+                        unsafe {
+                            EXPECTED_TCP_FRAMES.delete(&socket_pair);
+                        }
+                    }
+                } else {
+                    // TODO: Unexpected!
+                }
+            } else {
+                // Maybe the start of a TLS message?
+                let tls_start = eth_hdr_len + ip_hdr_len + tcp_hdr_len as usize;
+                let content_type: u8 = skb.load(tls_start)?;
+                let record_version: u16 = skb.load(tls_start + 1)?;
+                if content_type == 0x16 
+                    // Record version should be one of:
+                    // SSLv3 (0x0300), TLS 1.0 (0x0301), TLS 1.1 (0x0302), TLS 1.2 (0x0303), TLS 1.3 (0x0304)
+                    // Note: During Client Hello, version is always specified as 0x0301.
+                    && (record_version == 0x0300 || record_version == 0x0301 || record_version == 0x0302 || record_version == 0x0303 || record_version == 0x0304) 
+                {
+                    class = TrafficClass::TLS;
+
+                    let tls_total_len: u16 = skb.load::<__u16>(tls_start + 3)?;
+                    // The amount of TLS data from this packet is the total TCP data length minus the TLS header.
+                    let tls_segment_len = tcp_data_len - 5;
+                    // If the payload length is less than what the TLS record header says, we know we've got a
+                    // fragmented message.
+                    if tls_total_len > tls_segment_len {
+                        let needed = tls_total_len - tls_segment_len;
+                        unsafe {
+                            EXPECTED_TCP_FRAMES.set(&socket_pair, &ExpectedTcpFrame{
+                                payload_bytes_needed: needed,
+                                next_sequence: seq_num + tcp_data_len as u32,
+                                class: class.to_u64(),
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
    
@@ -84,7 +139,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
         unsafe {
             let metadata = PacketMetadata::new(
                 src,
-                dst,
+                dest,
                 packet_size,
                 raw_ip_proto,
                 class.to_u64(),

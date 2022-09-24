@@ -75,3 +75,11 @@ impl PacketMetadata {
         }
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct ExpectedTcpFrame {
+    pub payload_bytes_needed: u16,
+    pub next_sequence: u32,
+    pub class: u64,
+}

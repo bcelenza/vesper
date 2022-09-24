@@ -7,6 +7,7 @@ use tracing_subscriber::FmtSubscriber;
 use vesper::listeners::network::NetworkConfig;
 use vesper::listeners::network::NetworkListener;
 use vesper::listeners::Listener;
+use vesper::processors::{dns::DnsProcessor, tls::TlsProcessor};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -23,7 +24,7 @@ async fn main() {
 
     // Setup tracing.
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::DEBUG)
         .with_writer(io::stderr)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
@@ -35,7 +36,7 @@ async fn main() {
     }
 
     // Load the eBPF listeners.
-    let mut network_listener = NetworkListener::new().expect("could not load network probe");
+    let mut network_listener = NetworkListener::new(DnsProcessor::new(), TlsProcessor::new()).expect("could not load network probe");
     info!("Attaching to network interface {}", args.interface);
     network_listener.attach(NetworkConfig{ interface: args.interface.to_owned() }).expect("could not attach network probe to interface");
 

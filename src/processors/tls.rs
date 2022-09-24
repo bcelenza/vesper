@@ -1,9 +1,10 @@
-use std::error::Error;
+use std::{error::Error, collections::HashMap};
 use std::fmt;
 
 use etherparse::SlicedPacket;
-use tls_parser::{TlsMessage,  TlsRecordType, TlsMessageHandshake};
-use tracing::error;
+use tls_parser::{TlsMessage, TlsMessageHandshake};
+use tracing::{error, debug};
+use crate::events::SocketPair;
 use crate::events::{Logger, tls::{ClientHelloEvent, ServerHelloEvent}, Event};
 
 use super::PacketProcessor;
@@ -22,45 +23,83 @@ impl fmt::Display for TlsProcessorError<'_> {
 }
 
 
-pub struct TlsProcessor;
+pub struct TlsProcessor {
+    _payload_buffer: HashMap<SocketPair, Vec<u8>>,
+}
+
+impl TlsProcessor {
+    pub fn new() -> TlsProcessor {
+        TlsProcessor { _payload_buffer: HashMap::with_capacity(1024) }
+    }
+}
+
+impl Default for TlsProcessor {
+    fn default() -> Self {
+        TlsProcessor::new()
+    }
+}
 
 impl PacketProcessor for TlsProcessor {
-    fn process(packet: &SlicedPacket) -> Result<(), Box<dyn Error>> {
-        let parsed = tls_parser::parse_tls_plaintext(packet.payload);
-        match parsed {
-            Ok((_, record)) => {
-                let record_type = record.hdr.record_type;
-                match record_type {
-                    TlsRecordType::Handshake => {
-                        let message = record.msg.first().unwrap();
-                        match message {
-                            TlsMessage::Handshake(handshake) => {
-                                match handshake {
-                                    TlsMessageHandshake::ClientHello(hello) => {
-                                        Logger::log_event(Event::TlsClientHello(ClientHelloEvent::from(packet, hello)?))?;
-                                    },
-                                    TlsMessageHandshake::ServerHello(hello) => {
-                                        Logger::log_event(Event::TlsServerHello(ServerHelloEvent::from(packet, hello)?))?;
-                                    },
-                                    // Everything else we don't care about (yet).
-                                    _ => {}, 
-                                }
-                            },
-                            // We don't expect anything other than handshakes, since that's what we filter for
-                            // in the BPF probe.
-                            _ => error!("Unhandled TLS message type: {:?}", message)
+    fn process(&mut self, packet: &SlicedPacket) -> Result<(), Box<dyn Error>> {
+        let mut reassembled_payload: Vec<u8> = Vec::new();
+
+        // If there is any data in the payload buffer for this socket pair, start with it.
+        let socket_pair = SocketPair::from_packet(packet)?;
+        if self._payload_buffer.contains_key(&socket_pair) {
+            reassembled_payload = self._payload_buffer.get(&socket_pair).unwrap().clone();
+        }
+
+        // Append the payload from this packet.
+        reassembled_payload.extend_from_slice(packet.payload);
+
+        // The TLS message may be fragmented and multi-message.
+        match tls_parser::parse_tls_raw_record(&reassembled_payload) {
+            Ok((_, ref record)) => {
+                match tls_parser::parse_tls_record_with_header(record.data, &record.hdr) {
+                    Ok((_, ref messages)) => {
+                        // We've found all messages from the (potentially reassembled payload), clear
+                        // out the buffer.
+                        self._payload_buffer.remove(&socket_pair);
+
+                        // Process each message independently
+                        for message in messages {
+                            match message {
+                                TlsMessage::Handshake(handshake) => {
+                                    match handshake {
+                                        TlsMessageHandshake::ClientHello(hello) => {
+                                            Logger::log_event(Event::TlsClientHello(ClientHelloEvent::from(packet, hello)?))?;
+                                        },
+                                        TlsMessageHandshake::ServerHello(hello) => {
+                                            Logger::log_event(Event::TlsServerHello(ServerHelloEvent::from(packet, hello)?))?;
+                                        },
+                                        // Everything else we don't care about (yet).
+                                        _ => (), 
+                                    }
+                                },
+                                // We don't expect anything other than handshakes, since that's what we filter for
+                                // in the BPF probe.
+                                _ => error!("Unhandled TLS message type: {:?}", message),
+                            }
                         }
-                    }
-                    // We don't expect anything other than handshakes, since that's what we filter for
-                    // in the BPF probe.
-                    _ => error!("Unhandled TLS record type: {:?}", record)
+                    },
+                    Err(tls_parser::Err::Incomplete(needed)) => {
+                        debug!("Incomplete TLS record. Needed: {:?}", needed);
+                        
+                        // set payload buffer from reassmbled payload
+                        self._payload_buffer.insert(socket_pair, reassembled_payload);
+                    },
+                    Err(e) => error!("Could not parse TLS record: {}", e),
                 }
             },
-            Err(e) => {
-                error!("Could not parse TLS packet: {:?} (packet={:?})", e, packet);
-                return Err(Box::new(TlsProcessorError::ParserError("Could not parse TLS packet")));
-            }
+            Err(tls_parser::Err::Incomplete(needed)) => {
+                debug!("Incomplete TLS record. Needed: {:?}", needed);
+
+                // set payload buffer from reassmbled payload
+                self._payload_buffer.insert(socket_pair, reassembled_payload);
+            },
+            Err(e) => error!("Could not parse TLS record: {}", e),
         }
         Ok(())
     }
 }
+

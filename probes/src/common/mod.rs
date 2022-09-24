@@ -85,6 +85,13 @@ impl fmt::Display for SocketAddress {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct SocketPair {
+    pub src: SocketAddress,
+    pub dest: SocketAddress,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

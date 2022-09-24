@@ -8,8 +8,20 @@ use super::PacketProcessor;
 
 pub struct DnsProcessor;
 
+impl DnsProcessor {
+    pub fn new() -> DnsProcessor {
+        DnsProcessor{}
+    }
+}
+
+impl Default for DnsProcessor {
+    fn default() -> Self {
+        DnsProcessor::new()
+    }
+}
+
 impl PacketProcessor for DnsProcessor {
-    fn process(packet: &SlicedPacket) -> Result<(), Box<dyn Error>> {
+    fn process(&mut self, packet: &SlicedPacket) -> Result<(), Box<dyn Error>> {
         let dns_packet = DnsPacket::parse(packet.payload)?;
 
         if dns_packet.header.query {

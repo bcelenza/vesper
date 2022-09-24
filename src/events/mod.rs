@@ -45,12 +45,13 @@ impl Event {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct SocketAddress {
     ip: String,
     port: u16,
 }
 
+#[derive(Eq, Hash, PartialEq)]
 pub struct SocketPair {
     source: SocketAddress,
     destination: SocketAddress,

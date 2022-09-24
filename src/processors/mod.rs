@@ -6,5 +6,5 @@ pub mod dns;
 pub mod tls;
 
 pub trait PacketProcessor {
-    fn process(packet: &SlicedPacket) -> Result<(), Box<dyn Error>>;
+    fn process(&mut self, packet: &SlicedPacket) -> Result<(), Box<dyn Error>>;
 }

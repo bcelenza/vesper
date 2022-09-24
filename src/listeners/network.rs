@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use etherparse::{SlicedPacket, InternetSlice};
 use mio::{Poll, Events, net::UnixStream, Token, Interest};
 use redbpf::{Error as BpfError, load::{Loaded, Loader, LoaderError}, HashMap};
-use tracing::{error, debug, info};
+use tracing::{error, info};
 
 use probes::network::{PacketMetadata, TrafficClass};
 
@@ -15,6 +15,8 @@ use super::{Listener, ListenerError};
 pub struct NetworkListener {
     _loaded: Loaded,
     _fds: Vec<i32>,
+    dns_processor: DnsProcessor,
+    tls_processor: TlsProcessor,
 }
 pub struct NetworkConfig {
     pub interface: String,
@@ -25,17 +27,21 @@ fn packet_len(buf: &[u8]) -> usize {
     ETH_HDR_LEN + ((buf[ETH_HDR_LEN + 2] as usize) << 8 | buf[ETH_HDR_LEN + 3] as usize)
 }
 
-#[async_trait]
-impl Listener for NetworkListener {
-    type Config = NetworkConfig;
-
-    fn new() -> Result<NetworkListener, LoaderError> {
+impl NetworkListener {
+    pub fn new(dns_processor: DnsProcessor, tls_processor: TlsProcessor) -> Result<NetworkListener, LoaderError> {
         let loaded = Loader::load(bytecode())?;
         Ok(NetworkListener {
             _loaded: loaded,
             _fds: Vec::new(),
+            dns_processor,
+            tls_processor,
         })
     }
+}
+
+#[async_trait]
+impl Listener for NetworkListener {
+    type Config = NetworkConfig;
 
     fn attach(&mut self, config: NetworkConfig) -> Result<(), BpfError> {
         let mut fds: Vec<i32> = Vec::new();
@@ -80,7 +86,6 @@ impl Listener for NetworkListener {
                 }
             }
 
-            debug!("Handling {} new events.", events.iter().count());
             for _ in &events {
                 // Read raw bytes to the buffer from the stream.
                 // Before we can read the full packet from the stream, we need to know how much to read.
@@ -95,7 +100,6 @@ impl Listener for NetworkListener {
                     error!("Could not peek packet header from socket: {}", peek_result.unwrap_err());
                     continue;
                 }
-                debug!("Received {} bytes (expected={}) by peeking at the socket.", peek_result.unwrap(), peek_len);
 
                 // Determine the packet length from the header.
                 let packet_len = packet_len(&head_buffer);
@@ -139,12 +143,12 @@ impl Listener for NetworkListener {
                 let class = TrafficClass::from_u64(metadata.unwrap().class);
                 match class {
                     TrafficClass::DNS => {
-                        if let Err(e) = DnsProcessor::process(&packet) {
+                        if let Err(e) = self.dns_processor.process(&packet) {
                             error!("Cold not process DNS packet: {}", e);
                         }
                     },
                     TrafficClass::TLS => {
-                        if let Err(e) = TlsProcessor::process(&packet) {
+                        if let Err(e) = self.tls_processor.process(&packet) {
                             error!("Could not process TLS packet: {}", e);
                         }
                     },
