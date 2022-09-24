@@ -64,18 +64,6 @@ pub struct PacketMetadata {
     pub class: u64,
 }
 
-impl PacketMetadata {
-    pub fn new(src: SocketAddress, dest: SocketAddress, length: usize, protocol: u64, class: u64) -> Self {
-        PacketMetadata { 
-            src,
-            dest,
-            length,
-            protocol,
-            class,
-        }
-    }
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct ExpectedTcpFrame {

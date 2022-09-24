@@ -9,13 +9,25 @@ use vesper::listeners::network::NetworkListener;
 use vesper::listeners::Listener;
 use vesper::processors::{dns::DnsProcessor, tls::TlsProcessor};
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum LogLevel {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct CommandArgs {
     /// Name of the interface to attach
     #[clap(short, long, value_parser, default_value = "lo")]
     interface: String,
+    /// The logging level of the agent
+    #[clap(short, long, value_enum, default_value_t = LogLevel::Info)]
+    log_level: LogLevel,
 }
+
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -24,7 +36,12 @@ async fn main() {
 
     // Setup tracing.
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::DEBUG)
+        .with_max_level(match args.log_level {
+            LogLevel::Debug => Level::DEBUG,
+            LogLevel::Info => Level::INFO,
+            LogLevel::Warn => Level::WARN,
+            LogLevel::Error => Level::ERROR,
+        })
         .with_writer(io::stderr)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();

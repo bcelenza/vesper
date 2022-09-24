@@ -49,4 +49,4 @@ release: clean test build
 
 .PHONY: run
 run:
-	sudo target/debug/vesper -i $(INTERFACE)
+	sudo target/debug/vesper -i $(INTERFACE) -l debug

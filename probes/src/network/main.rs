@@ -137,13 +137,13 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
     // Add the packet metadata to the map for user space.
     if class != TrafficClass::UNCLASSIFIED {
         unsafe {
-            let metadata = PacketMetadata::new(
+            let metadata = PacketMetadata{
                 src,
                 dest,
-                packet_size,
-                raw_ip_proto,
-                class.to_u64(),
-            );
+                length: packet_size,
+                protocol: raw_ip_proto,
+                class: class.to_u64(),
+            };
 
             // TODO: Come up with a more unique key. This will eventually collide, even though
             // the user space program is keeping up in most cases.
