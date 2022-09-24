@@ -14,8 +14,8 @@ The goal of vesper is to provide _transparency_ around what a host is doing, who
 
 Vesper can provide information about what DNS queries have been made from the host, who responded, and what that response was:
 
-```
-# DNS query made by the host
+```json
+// DNS query made by the host
 {
     "time":"2022-09-19T14:41:27.127059667+00:00",
     "type":"DnsQuery",
@@ -31,7 +31,7 @@ Vesper can provide information about what DNS queries have been made from the ho
     }
 }
 
-# Subsequent response received by the host
+// Subsequent response received by the host
 {
     "time":"2022-09-19T14:41:27.175101163+00:00",
     "type":"DnsResponse",
@@ -58,10 +58,10 @@ Vesper can provide information about what DNS queries have been made from the ho
 
 #### TLS Negotiation
 
-Vesper monitors all TCP traffic to look for packet signatures that match TLS negotiations. It currently provides information for the TLS [Client Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.2) and [Server Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.3) events. If you have a specific compliance need for TLS and cipher usage (e.g., TLS 1.2 only with FIPS 140-2 ciphers), Vesper can monitor and report on what's actually being used:
+Vesper monitors all TCP traffic to look for packet signatures that match TLS negotiations. It currently provides information for the TLS [Client Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.2) and [Server Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.3) events. If you have a specific compliance need for TLS and cipher usage (e.g., TLS 1.2+ only with FIPS 140-2 ciphers), Vesper can monitor and report on what's actually being used:
 
-```
-# TLS client hello made by the host
+```json
+// TLS client hello made by the host
 {
     "time":"2022-09-19T14:41:24.894583531+00:00",
     "type":"TlsClientHello",
@@ -96,7 +96,7 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
     }
 }
 
-# TLS server hello made by the remote host
+// TLS server hello made by the remote host
 {
     "time":"2022-09-19T14:41:24.896369601+00:00",
     "type":"TlsSeverHello",
@@ -113,9 +113,8 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
 
 ## Design Goals
 
-1. Security: It should go without saying. Although eBPF has [mechanisms to protect against unsafe programs](https://ebpf.io/what-is-ebpf#verification), we should consider security at every step of the pipeline.
-2. Simplicity: Focus the agent's features on getting and exposing the data. Don't add features that could be done better by another application (e.g., log offload to the cloud).
-3. Performance: Keep the packet data path as fast as possible.
+1. Simplicity: Focus the agent's features on getting and exposing the data. Don't add features that could be done better by another application (e.g., log offload to the cloud).
+2. Performance: Keep the packet data path as fast as possible.
 
 ## Feature Goals
 
@@ -124,9 +123,6 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
   * Protocol-specific diagnostic information (e.g., TCP retransmits)
   * DNS query and response data 
   * TLS negotiation information
-* Output
-  * JSON logging
-  * [CIM](https://www.dmtf.org/standards/cim)-compliant data format
 * Configuration
   * Ignore traffic from specific sources/destinations (ideally by domain or CIDR)
   * Attach to multiple network interfaces
