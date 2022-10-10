@@ -7,7 +7,7 @@ use etherparse::TransportSlice::{Tcp, Udp};
 use serde::Serialize;
 use serde_json::Error;
 
-use self::tls::ServerHelloEvent;
+use self::tls::{ServerHelloEvent, CertificateEvent};
 use self::{dns::{QueryEvent, AnswerEvent}, tls::ClientHelloEvent};
 
 pub mod dns;
@@ -32,6 +32,7 @@ pub enum Event {
     DnsResponse(AnswerEvent),
     TlsClientHello(ClientHelloEvent),
     TlsServerHello(ServerHelloEvent),
+    TlsCertificate(CertificateEvent),
 }
 
 impl Event {
@@ -41,6 +42,7 @@ impl Event {
             Self::DnsResponse(_) => String::from("DnsResponse"),
             Self::TlsClientHello(_) => String::from("TlsClientHello"),
             Self::TlsServerHello(_) => String::from("TlsServerHello"),
+            Self::TlsCertificate(_) => String::from("TlsCertificate"),
         }
     }
 }

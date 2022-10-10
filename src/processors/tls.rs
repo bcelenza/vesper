@@ -5,6 +5,7 @@ use etherparse::SlicedPacket;
 use tls_parser::{TlsMessage, TlsMessageHandshake};
 use tracing::{error, debug};
 use crate::events::SocketPair;
+use crate::events::tls::CertificateEvent;
 use crate::events::{Logger, tls::{ClientHelloEvent, ServerHelloEvent}, Event};
 
 use super::PacketProcessor;
@@ -57,7 +58,7 @@ impl PacketProcessor for TlsProcessor {
             Ok((_, ref record)) => {
                 match tls_parser::parse_tls_record_with_header(record.data, &record.hdr) {
                     Ok((_, ref messages)) => {
-                        // We've found all messages from the (potentially reassembled payload), clear
+                        // We've found all messages from the (potentially reassembled) payload, clear
                         // out the buffer.
                         self._payload_buffer.remove(&socket_pair);
 
@@ -72,8 +73,11 @@ impl PacketProcessor for TlsProcessor {
                                         TlsMessageHandshake::ServerHello(hello) => {
                                             Logger::log_event(Event::TlsServerHello(ServerHelloEvent::from(packet, hello)?))?;
                                         },
+                                        TlsMessageHandshake::Certificate(certificate) => {
+                                            Logger::log_event(Event::TlsCertificate(CertificateEvent::from(packet, certificate)?))?
+                                        },
                                         // Everything else we don't care about (yet).
-                                        _ => (), 
+                                        _ => debug!("Received unhandled TLS handshake message: {:?}", message),
                                     }
                                 },
                                 // We don't expect anything other than handshakes, since that's what we filter for
@@ -84,7 +88,7 @@ impl PacketProcessor for TlsProcessor {
                     },
                     Err(tls_parser::Err::Incomplete(needed)) => {
                         debug!("Incomplete TLS record. Needed: {:?}", needed);
-                        
+
                         // set payload buffer from reassmbled payload
                         self._payload_buffer.insert(socket_pair, reassembled_payload);
                     },
@@ -102,4 +106,3 @@ impl PacketProcessor for TlsProcessor {
         Ok(())
     }
 }
-

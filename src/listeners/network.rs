@@ -86,7 +86,7 @@ impl Listener for NetworkListener {
                 }
             }
 
-            for _ in &events {
+            for _ in events.iter() {
                 // Read raw bytes to the buffer from the stream.
                 // Before we can read the full packet from the stream, we need to know how much to read.
                 // Peek at the packet header to figure out how long it is.
@@ -138,7 +138,7 @@ impl Listener for NetworkListener {
                     continue;
                 }
                 packet_metadata.delete(id);
-                
+
                 // Process packet based on how it was classified.
                 let class = TrafficClass::from_u64(metadata.unwrap().class);
                 match class {

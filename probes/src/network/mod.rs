@@ -68,6 +68,6 @@ pub struct PacketMetadata {
 #[derive(Clone, Copy, Debug)]
 pub struct ExpectedTcpFrame {
     pub payload_bytes_needed: u16,
-    pub next_sequence: u32,
+    pub sequence_num: u32,
     pub class: u64,
 }

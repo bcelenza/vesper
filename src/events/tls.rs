@@ -1,6 +1,8 @@
 use etherparse::SlicedPacket;
+use openssl::{x509::X509, nid::Nid};
 use serde::Serialize;
-use tls_parser::{parse_tls_extensions, TlsClientHelloContents, TlsCipherSuite, TlsServerHelloContents, TlsCipherSuiteID};
+use tls_parser::{parse_tls_extensions, TlsClientHelloContents, TlsCipherSuite, TlsServerHelloContents, TlsCipherSuiteID, TlsCertificateContents};
+use tracing::{error, warn};
 
 use super::{SocketAddress, EventError, SocketPair};
 
@@ -63,15 +65,15 @@ impl ClientHelloEvent {
                 }
             }).collect();
         }
-        Ok(ClientHelloEvent { 
-            source: socket_pair.source, 
+        Ok(ClientHelloEvent {
+            source: socket_pair.source,
             destination: socket_pair.destination,
             version: TlsVersion::from(t.version),
             ciphers: t.ciphers.iter()
                 .map(cipher_to_string)
                 .collect(),
             extensions,
-        })      
+        })
     }
 }
 
@@ -96,6 +98,61 @@ impl ServerHelloEvent {
 }
 
 #[derive(Debug, Serialize)]
+pub struct Certificate {
+    // pub issuer: String,
+    pub common_name: String,
+    pub subject_alternative_names: Vec<String>,
+    // pub signature: String,
+}
+
+impl From<X509> for Certificate {
+    fn from<'a>(c: X509) -> Self {
+        let subject_alternative_names = if let Some(alt_names) = c.subject_alt_names() {
+            alt_names.iter().map(|n| String::from(n.dnsname().unwrap())).collect()
+        } else {
+            Vec::new()
+        };
+        let common_names: Vec<String> = c.subject_name()
+            .entries_by_nid(Nid::COMMONNAME)
+            .map(|n| String::from_utf8(n.data().as_slice().to_vec()).unwrap())
+            .collect();
+        if common_names.len() > 1 {
+            warn!("Certificate has multiple common names: {:?}", common_names);
+        }
+        Certificate{
+            common_name: common_names.first().unwrap().to_string(),
+            subject_alternative_names,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct CertificateEvent {
+    source: SocketAddress,
+    destination: SocketAddress,
+    certificate_chain: Vec<Certificate>,
+}
+
+impl CertificateEvent {
+    pub fn from<'a>(packet: &SlicedPacket, t: &TlsCertificateContents) -> Result<Self, EventError<'a>> {
+        let socket_pair = SocketPair::from_packet(packet)?;
+        let certificate_chain = t.cert_chain.iter().flat_map(|raw_cert| {
+            let cert = X509::from_der(raw_cert.data);
+            if cert.is_err() {
+                error!("Could not decode X509 certificate: {}", cert.unwrap_err());
+                return None;
+            }
+            Some(Certificate::from(cert.unwrap()))
+        }).collect();
+        Ok(CertificateEvent {
+            source: socket_pair.source,
+            destination: socket_pair.destination,
+            certificate_chain,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct CipherChangeEvent {
     source: SocketAddress,
     destination: SocketAddress,
@@ -114,5 +171,5 @@ fn cipher_to_string(id: &TlsCipherSuiteID) -> String {
         Some(c) => String::from(c.name),
         None => format!("UNKNOWN (0x{:x})", id.0),
     }
-    
+
 }

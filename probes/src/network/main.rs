@@ -20,7 +20,7 @@ static mut PACKET_METADATA: HashMap<u16, PacketMetadata> = HashMap::with_max_ent
 #[map(link_section = "maps/expected_tcp_frames")]
 static mut EXPECTED_TCP_FRAMES: HashMap<SocketPair, ExpectedTcpFrame> = HashMap::with_max_entries(1024);
 
-/// Filter packets from the network, categorizing 
+/// Filter packets from the network, categorizing and sending to user space for processing.
 #[socket_filter]
 pub fn filter_network(skb: SkBuff) -> SkBuffResult {
     let packet_size = unsafe { (*skb.skb).len as usize };
@@ -34,7 +34,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
         return Ok(SkBuffAction::Ignore);
     }
 
-    // Capture the IP protocol (e.g., TCP, UDP), and exit if it's not one 
+    // Capture the IP protocol (e.g., TCP, UDP), and exit if it's not one
     // we support.
     let raw_ip_proto = skb.load::<__u8>(eth_hdr_len + offset_of!(iphdr, protocol))? as u64;
     let ip_proto = Protocol::from_u64(raw_ip_proto);
@@ -77,7 +77,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
             let seq_num: u32 = skb.load(eth_hdr_len + ip_hdr_len + offset_of!(tcphdr, seq))?;
             // If we're expecting this sequence number, we can optimistically classify.
             if let Some(expected_frame) = unsafe { EXPECTED_TCP_FRAMES.get(&socket_pair) } {
-                if seq_num == expected_frame.next_sequence {
+                if seq_num == expected_frame.sequence_num {
                     // If we were expecting this sequence number, we know its class.
                     class = TrafficClass::from_u64(expected_frame.class);
 
@@ -88,7 +88,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
                         unsafe {
                             EXPECTED_TCP_FRAMES.set(&socket_pair, &ExpectedTcpFrame{
                                 payload_bytes_needed: needed,
-                                next_sequence: seq_num + tcp_data_len as u32,
+                                sequence_num: seq_num + tcp_data_len as u32,
                                 class: expected_frame.class,
                             });
                         }
@@ -99,18 +99,18 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
                         }
                     }
                 } else {
-                    // TODO: Unexpected!
+                    printk!("Unexpected TCP frame receieved: expected=%u, received=%u", expected_frame.sequence_num, seq_num);
                 }
             } else {
                 // Maybe the start of a TLS message?
                 let tls_start = eth_hdr_len + ip_hdr_len + tcp_hdr_len as usize;
                 let content_type: u8 = skb.load(tls_start)?;
                 let record_version: u16 = skb.load(tls_start + 1)?;
-                if content_type == 0x16 
+                if content_type == 0x16
                     // Record version should be one of:
                     // SSLv3 (0x0300), TLS 1.0 (0x0301), TLS 1.1 (0x0302), TLS 1.2 (0x0303), TLS 1.3 (0x0304)
                     // Note: During Client Hello, version is always specified as 0x0301.
-                    && (record_version == 0x0300 || record_version == 0x0301 || record_version == 0x0302 || record_version == 0x0303 || record_version == 0x0304) 
+                    && (record_version == 0x0300 || record_version == 0x0301 || record_version == 0x0302 || record_version == 0x0303 || record_version == 0x0304)
                 {
                     class = TrafficClass::TLS;
 
@@ -124,7 +124,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
                         unsafe {
                             EXPECTED_TCP_FRAMES.set(&socket_pair, &ExpectedTcpFrame{
                                 payload_bytes_needed: needed,
-                                next_sequence: seq_num + tcp_data_len as u32,
+                                sequence_num: seq_num + tcp_data_len as u32,
                                 class: class.to_u64(),
                             });
                         }
@@ -133,7 +133,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
             }
         }
     }
-   
+
     // Add the packet metadata to the map for user space.
     if class != TrafficClass::UNCLASSIFIED {
         unsafe {
