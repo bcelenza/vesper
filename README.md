@@ -134,14 +134,23 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
 ### Prerequisities
 
 * Rust (any version)
-* LLVM 13
+* LLVM 13, clang 13, pkg-config
+* libssl-dev or openssl-dev
+
+If you're on unbutu, you can install the required system libraries via:
+
+```bash
+apt install build-essential \
+    libclang-13-dev \
+    libclang-common-13-dev \
+    libssl-dev \
+    pkg-config
+```
 
 ### Getting Started
 
 1. Clone the repository.
 2. Run `make install`
-
-This will install Rust 1.59 so that LLVM 13 is used by both `rustc` and cargo-bpf, which is needed for BPF probes to work. ([Read More](https://github.com/foniod/redbpf#valid-combinations-of-rust-and-llvm-versions))
 
 ### Build and Run
 
