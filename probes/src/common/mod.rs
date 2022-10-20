@@ -16,22 +16,25 @@ pub struct IPv6Address {
 impl IPv6Address {
     /// Converts a given IPv4 address represented as a u32 into an IPv6Address.
     pub fn from_v4u32(address: u32) -> Self {
-        let octets: [u8; 4] = address.to_be_bytes();
-        IPv6Address { 
-            a: 0, 
-            b: 0, 
-            c: 0, 
-            d: 0, 
-            e: 0, 
-            f: 0xffff, 
-            g: ((octets[0] as u16) << 8) | octets[1] as u16, 
+        IPv6Address::from_v4slice(address.to_be_bytes())
+    }
+
+    pub fn from_v4slice(octets: [u8; 4]) -> Self {
+        IPv6Address {
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            f: 0xffff,
+            g: ((octets[0] as u16) << 8) | octets[1] as u16,
             h: ((octets[2] as u16) << 8) | octets[3] as u16,
-        }        
+        }
     }
 
     /// Returns true if the IPv6Address can be represnted as an IPv4
     pub fn is_v4(&self) -> bool {
-        self.a == 0 && 
+        self.a == 0 &&
         self.b == 0 &&
         self.c == 0 &&
         self.d == 0 &&

@@ -4,13 +4,26 @@ use async_trait::async_trait;
 use etherparse::{SlicedPacket, InternetSlice};
 use mio::{Poll, Events, net::UnixStream, Token, Interest};
 use redbpf::{Error as BpfError, load::{Loaded, Loader, LoaderError}, HashMap};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
-use probes::network::{PacketMetadata, TrafficClass};
+use probes::{network::{PacketMetadata, TrafficClass, PacketMetadataKey}, common::{SocketPair, IPv6Address, SocketAddress}};
 
 use crate::{processors::{dns::DnsProcessor, PacketProcessor, tls::TlsProcessor}};
 
 use super::{Listener, ListenerError};
+
+/// Given an express that returns a Result type, return the value or log the error and continue the loop.
+macro_rules! continue_on_err {
+    ($res:expr) => {
+        match $res {
+            Ok(val) => val,
+            Err(e) => {
+                error!("Encoutered error: {:?}.", e);
+                continue;
+            }
+        }
+    };
+}
 
 pub struct NetworkListener {
     _loaded: Loaded,
@@ -20,6 +33,12 @@ pub struct NetworkListener {
 }
 pub struct NetworkConfig {
     pub interface: String,
+}
+
+
+#[derive(Debug)]
+enum ParseError<'a> {
+    IncompletePacketError(&'a str),
 }
 
 const ETH_HDR_LEN: usize = 14;
@@ -71,7 +90,7 @@ impl Listener for NetworkListener {
         // Create a reference to the probe's packet metadata map.
         let loaded = & self._loaded;
         let metadata_map = loaded.map("packet_metadata").expect("Could not find packet_metadata map");
-        let packet_metadata: HashMap<u16, PacketMetadata> = HashMap::new(metadata_map).expect("Could not load class map");
+        let packet_metadata: HashMap<PacketMetadataKey, PacketMetadata> = HashMap::new(metadata_map).expect("Could not load class map");
 
         // Process incoming events.
         info!("Listening for network events.");
@@ -114,37 +133,24 @@ impl Listener for NetworkListener {
                 }
 
                 // Parse the packet contents starting with the Ethernet header.
-                let parsed = SlicedPacket::from_ethernet(&buffer);
-                if parsed.is_err() {
-                    error!("Could not parse packet: {} (packetLen={})", parsed.unwrap_err(), buffer.len());
-                    continue;
-                }
-
-                // Get the IP packet ID from the IP header.
-                let packet = parsed.unwrap();
-                if packet.ip.is_none() {
-                    error!("Could not process packet: no IP header");
-                    continue;
-                }
-                let id = match packet.ip.as_ref().unwrap() {
-                    InternetSlice::Ipv4(h, _ext) => h.identification(),
-                    _ => panic!("IPv6 not implemented yet."),
-                };
+                let packet = continue_on_err!(SlicedPacket::from_ethernet(&buffer));
 
                 // Get the PacketMetadata from the shared map, then delete it.
-                let metadata = packet_metadata.get(id);
+                let metadata_key = continue_on_err!(get_metadata_key(&packet));
+                let metadata = packet_metadata.get(metadata_key);
                 if metadata.is_none() {
-                    error!("Could not find metadata for packet with ID {}", id);
+                    error!("Could not find metadata for packet with ID {:?}", metadata_key);
+                    debug!("Packet: {:?}", packet);
                     continue;
                 }
-                packet_metadata.delete(id);
+                packet_metadata.delete(metadata_key);
 
                 // Process packet based on how it was classified.
                 let class = TrafficClass::from_u64(metadata.unwrap().class);
                 match class {
                     TrafficClass::DNS => {
                         if let Err(e) = self.dns_processor.process(&packet) {
-                            error!("Cold not process DNS packet: {}", e);
+                            error!("Could not process DNS packet: {}", e);
                         }
                     },
                     TrafficClass::TLS => {
@@ -157,6 +163,29 @@ impl Listener for NetworkListener {
             }
         }
     }
+}
+
+fn get_metadata_key<'a>(packet: &SlicedPacket) -> Result<PacketMetadataKey, ParseError<'a>> {
+    if packet.ip.is_none() {
+        return Err(ParseError::IncompletePacketError("No IP header"));
+    }
+    let ip_header = match packet.ip.as_ref().unwrap() {
+        InternetSlice::Ipv4(h, _ext) => h,
+        _ => panic!("IPv6 not implemented yet."),
+    };
+    let ports: (u16, u16) = match packet.transport.as_ref().unwrap() {
+        etherparse::TransportSlice::Udp(t) => (t.source_port(), t.destination_port()),
+        etherparse::TransportSlice::Tcp(t) => (t.source_port(), t.destination_port()),
+        _ => panic!("Unhandled transport type."),
+    };
+
+    Ok(PacketMetadataKey{
+        socket_pair: SocketPair{
+            src: SocketAddress::new(IPv6Address::from_v4slice(ip_header.source()), ports.0),
+            dest: SocketAddress::new(IPv6Address::from_v4slice(ip_header.destination()), ports.1),
+        },
+        id: ip_header.identification(),
+    })
 }
 
 fn bytecode() -> &'static [u8] {

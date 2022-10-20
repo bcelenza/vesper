@@ -1,3 +1,5 @@
+use crate::common::SocketPair;
+
 use super::common::SocketAddress;
 
 /// The IP protocol (e.g., TCP) of a given packet.
@@ -52,6 +54,13 @@ impl TrafficClass {
             TrafficClass::TLS => 2,
         }
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct PacketMetadataKey {
+    pub socket_pair: SocketPair,
+    pub id: u16,
 }
 
 #[repr(C)]

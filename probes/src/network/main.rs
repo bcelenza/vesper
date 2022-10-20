@@ -3,7 +3,7 @@
 
 use core::mem::{self, MaybeUninit};
 use memoffset::offset_of;
-use probes::{common::{IPv6Address, SocketAddress, SocketPair}, network::ExpectedTcpFrame};
+use probes::{common::{IPv6Address, SocketAddress, SocketPair}, network::{ExpectedTcpFrame, PacketMetadataKey}};
 use redbpf_probes::socket_filter::prelude::*;
 use probes::network::{PacketMetadata, Protocol, TrafficClass};
 
@@ -12,7 +12,7 @@ program!(0xFFFFFFFE, "GPL");
 /// Packet Metadata contains information about packets transiting the network.
 /// This is used in user space for further packet processing.
 #[map(link_section = "maps/packet_metadata")]
-static mut PACKET_METADATA: HashMap<u16, PacketMetadata> = HashMap::with_max_entries(1024);
+static mut PACKET_METADATA: HashMap<PacketMetadataKey, PacketMetadata> = HashMap::with_max_entries(1024);
 
 /// Expected TCP frames contains information about what TCP segment to expect next
 /// in the event an application message (e.g., TLS) is split across multiple TCP segments.
@@ -67,11 +67,11 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
     let mut class: TrafficClass = TrafficClass::UNCLASSIFIED;
 
     // TODO: Doesn't account for DNS over other ports, overly simplistic.
+    let socket_pair = SocketPair{src, dest};
     if src.port == 53 || dest.port == 53 {
         class = TrafficClass::DNS;
     } else {
         if ip_proto == Protocol::TCP {
-            let socket_pair = SocketPair{src, dest};
             let tcp_hdr_len = ((skb.load::<u8>(eth_hdr_len + ip_hdr_len as usize + 12)? >> 4) << 2) as u16;
             let tcp_data_len = ip_total_len - ip_hdr_len as u16 - tcp_hdr_len;
             let seq_num: u32 = skb.load(eth_hdr_len + ip_hdr_len + offset_of!(tcphdr, seq))?;
@@ -145,10 +145,11 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
                 class: class.to_u64(),
             };
 
-            // TODO: Come up with a more unique key. This will eventually collide, even though
-            // the user space program is keeping up in most cases.
-            // Probably a 5-tuple of (src_ip, src_port, dst_ip, dst_port, ip id).
-            PACKET_METADATA.set(&ip_id, &metadata);
+            let key = PacketMetadataKey {
+                socket_pair,
+                id: ip_id,
+            };
+            PACKET_METADATA.set(&key, &metadata);
             return Ok(SkBuffAction::SendToUserspace);
         }
     }
