@@ -12,13 +12,14 @@ use crate::{processors::{dns::DnsProcessor, PacketProcessor, tls::TlsProcessor}}
 
 use super::{Listener, ListenerError};
 
-/// Given an express that returns a Result type, return the value or log the error and continue the loop.
+/// Given an expression that returns a Result type, return the value or log the error
+/// and continue the loop.
 macro_rules! continue_on_err {
     ($res:expr) => {
         match $res {
             Ok(val) => val,
             Err(e) => {
-                error!("Encoutered error: {:?}.", e);
+                error!("Encountered error: {:?}. Continuing.", e);
                 continue;
             }
         }
