@@ -99,6 +99,7 @@ impl Listener for NetworkListener {
             if let Err(e) = poll.poll(&mut events, None) {
                 // Catch CTRL+C interrupts and exit the loop.
                 if e.kind() == ErrorKind::Interrupted {
+                    debug!("Caught interrupt signal. Exiting.");
                     return Ok(());
                 } else {
                     error!("Could not poll for events: {}", e);
@@ -107,60 +108,64 @@ impl Listener for NetworkListener {
             }
 
             for _ in events.iter() {
-                // Read raw bytes to the buffer from the stream.
-                // Before we can read the full packet from the stream, we need to know how much to read.
-                // Peek at the packet header to figure out how long it is.
-                let peek_len = ETH_HDR_LEN + 4;
-                let mut head_buffer = vec![0u8; peek_len];
-                let peek_result = match unsafe { libc::recv(self._fds[0], head_buffer.as_mut_ptr() as _, head_buffer.len(), 0x02) } {
-                    r if r < 0 => Err(Error::last_os_error()),
-                    r => Ok(r as usize),
-                };
-                if peek_result.is_err() {
-                    error!("Could not peek packet header from socket: {}", peek_result.unwrap_err());
-                    continue;
-                }
+                // There may be more than one packet ready on the socket. Loop through, peeking for the
+                // packet header and reading the full packet if present.
+                loop {
+                    // Read raw bytes to the buffer from the stream.
+                    // Before we can read the full packet from the stream, we need to know how much to read.
+                    // Peek at the packet header to figure out how long it is.
+                    let peek_len = ETH_HDR_LEN + 4;
+                    let mut head_buffer = vec![0u8; peek_len];
+                    let peek_result = match unsafe { libc::recv(self._fds[0], head_buffer.as_mut_ptr() as _, head_buffer.len(), 0x02) } {
+                        r if r < 0 => Err(Error::last_os_error()),
+                        r => Ok(r as usize),
+                    };
+                    if peek_result.is_err() || peek_result.unwrap() < peek_len {
+                        break;
+                    }
 
-                // Determine the packet length from the header.
-                let packet_len = packet_len(&head_buffer);
+                    // Determine the packet length from the header.
+                    let packet_len = packet_len(&head_buffer);
 
-                // Read the full packet from the stream.
-                let mut buffer = vec![0u8; packet_len];
-                if let Err(e) = stream.read_exact(&mut buffer) {
-                    // EAGAIN expected since stream is non-blocking
-                    if e.kind() != ErrorKind::WouldBlock {
+                    // Read the full packet from the stream.
+                    let mut buffer = vec![0u8; packet_len];
+                    // While the stream is non-blocking, if we've peeked the packet header we'd expect
+                    // the body to be there. Log an error and break out of the loop.
+                    if let Err(e) = stream.read_exact(&mut buffer) {
                         error!("Could not read from stream: {}", e);
+                        break;
+                    }
+
+                    // Parse the packet contents starting with the Ethernet header.
+                    let packet = continue_on_err!(SlicedPacket::from_ethernet(&buffer));
+
+                    // Get the PacketMetadata from the shared map, then delete it.
+                    let metadata_key = continue_on_err!(get_metadata_key(&packet));
+                    let metadata = packet_metadata.get(metadata_key);
+                    if metadata.is_none() {
+                        error!("Could not find metadata for packet with ID {:?}", metadata_key);
+                        debug!("Packet: {:?}", packet);
+                        continue;
+                    }
+                    packet_metadata.delete(metadata_key);
+
+                    // Process packet based on how it was classified.
+                    let class = TrafficClass::from_u64(metadata.unwrap().class);
+                    match class {
+                        TrafficClass::DNS => {
+                            if let Err(e) = self.dns_processor.process(&packet) {
+                                error!("Could not process DNS packet: {}", e);
+                            }
+                        },
+                        TrafficClass::TLS => {
+                            if let Err(e) = self.tls_processor.process(&packet) {
+                                error!("Could not process TLS packet: {}", e);
+                            }
+                        },
+                        _ => error!("Unhandled traffic class: {:?}", class)
                     }
                 }
 
-                // Parse the packet contents starting with the Ethernet header.
-                let packet = continue_on_err!(SlicedPacket::from_ethernet(&buffer));
-
-                // Get the PacketMetadata from the shared map, then delete it.
-                let metadata_key = continue_on_err!(get_metadata_key(&packet));
-                let metadata = packet_metadata.get(metadata_key);
-                if metadata.is_none() {
-                    error!("Could not find metadata for packet with ID {:?}", metadata_key);
-                    debug!("Packet: {:?}", packet);
-                    continue;
-                }
-                packet_metadata.delete(metadata_key);
-
-                // Process packet based on how it was classified.
-                let class = TrafficClass::from_u64(metadata.unwrap().class);
-                match class {
-                    TrafficClass::DNS => {
-                        if let Err(e) = self.dns_processor.process(&packet) {
-                            error!("Could not process DNS packet: {}", e);
-                        }
-                    },
-                    TrafficClass::TLS => {
-                        if let Err(e) = self.tls_processor.process(&packet) {
-                            error!("Could not process TLS packet: {}", e);
-                        }
-                    },
-                    _ => error!("Unhandled traffic class: {:?}", class)
-                }
             }
         }
     }

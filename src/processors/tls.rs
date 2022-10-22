@@ -77,7 +77,7 @@ impl PacketProcessor for TlsProcessor {
                                             Logger::log_event(Event::TlsCertificate(CertificateEvent::from(packet, certificate)?))?
                                         },
                                         // Everything else we don't care about (yet).
-                                        _ => debug!("Received unhandled TLS handshake message: {:?}", message),
+                                        _ => (),
                                     }
                                 },
                                 // We don't expect anything other than handshakes, since that's what we filter for
