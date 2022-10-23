@@ -1,5 +1,7 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use etherparse::SlicedPacket;
-use openssl::{x509::X509, nid::Nid};
+use openssl::{x509::{X509, X509NameEntries}, nid::Nid, asn1::Asn1Time};
 use serde::Serialize;
 use tls_parser::{parse_tls_extensions, TlsClientHelloContents, TlsCipherSuite, TlsServerHelloContents, TlsCipherSuiteID, TlsCertificateContents};
 use tracing::{error, warn};
@@ -132,32 +134,77 @@ impl ServerHelloEvent {
 }
 
 #[derive(Debug, Serialize)]
+pub struct CertificateValidityRemaining {
+    pub days: i32,
+    pub seconds: i32,
+}
+#[derive(Debug, Serialize)]
+pub struct CertificateValidity {
+    not_before: String,
+    not_after: String,
+    remaining: CertificateValidityRemaining,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CertificateIssuer {
+    pub country: String,
+    pub organization: String,
+    pub organizational_unit: String,
+    pub common_name: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct Certificate {
-    // pub issuer: String,
+    pub issuer: CertificateIssuer,
     pub common_name: String,
     pub subject_alternative_names: Vec<String>,
-    // pub signature: String,
+    pub validity: CertificateValidity,
 }
 
 impl From<X509> for Certificate {
     fn from<'a>(c: X509) -> Self {
+        let common_name= get_first_entry_as_string(c.subject_name().entries_by_nid(Nid::COMMONNAME));
+
         let subject_alternative_names = if let Some(alt_names) = c.subject_alt_names() {
             alt_names.iter().map(|n| String::from(n.dnsname().unwrap())).collect()
         } else {
             Vec::new()
         };
-        let common_names: Vec<String> = c.subject_name()
-            .entries_by_nid(Nid::COMMONNAME)
-            .map(|n| String::from_utf8(n.data().as_slice().to_vec()).unwrap())
-            .collect();
-        if common_names.len() > 1 {
-            warn!("Certificate has multiple common names: {:?}", common_names);
-        }
+
+        // Determine the amount of time remaining for this certificate's validity.
+        let now = Asn1Time::from_unix(SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .try_into()
+            .unwrap()).unwrap();
+        let remaining = now.diff(c.not_after()).unwrap();
+
         Certificate{
-            common_name: common_names.first().unwrap().to_string(),
+            common_name,
+            issuer: CertificateIssuer {
+                country: get_first_entry_as_string(c.issuer_name().entries_by_nid(Nid::COUNTRYNAME)),
+                organization: get_first_entry_as_string(c.issuer_name().entries_by_nid(Nid::ORGANIZATIONNAME)),
+                organizational_unit: get_first_entry_as_string(c.issuer_name().entries_by_nid(Nid::ORGANIZATIONALUNITNAME)),
+                common_name: get_first_entry_as_string(c.issuer_name().entries_by_nid(Nid::COMMONNAME)),
+            },
             subject_alternative_names,
+            validity: CertificateValidity {
+                not_before: c.not_before().to_string(),
+                not_after: c.not_after().to_string(),
+                remaining: CertificateValidityRemaining {
+                    days:  remaining.days,
+                    seconds: remaining.secs,
+                }
+            }
         }
     }
+}
+
+// Given a name of X509 name entries, returns the first as a string.
+fn get_first_entry_as_string(entries: X509NameEntries) -> String {
+    let values: Vec<String> = entries.map(|name| name.data().as_utf8().unwrap().to_string()).collect();
+    values.first().unwrap_or(&String::from("")).to_owned()
 }
 
 #[derive(Debug, Serialize)]

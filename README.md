@@ -6,7 +6,7 @@ A security-focused telemetry agent written in Rust using [eBPF](https://ebpf.io/
 
 ## What's provided?
 
-The goal of vesper is to provide _transparency_ around what a host is doing, who it's talking to, and how it's communicating. 
+The goal of vesper is to provide _transparency_ around what a host is doing, who it's talking to, and how it's communicating.
 
 ### Examples
 
@@ -111,6 +111,76 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
 }
 ```
 
+If the server is negotiation TLS with a version less than 1.3, Vesper will show the certificate information and remaining validity:
+
+```json
+{
+  "time": "2022-10-23T16:41:40.356350846+00:00",
+  "type": "TlsCertificate",
+  "event": {
+    "TlsCertificate": {
+      "source": { "ip": "20.189.173.12", "port": 443 },
+      "destination": { "ip": "192.168.109.2", "port": 52560 },
+      "certificate_chain": [
+        {
+          "issuer": {
+            "country": "US",
+            "organization": "Microsoft Corporation",
+            "organizational_unit": "",
+            "common_name": "Microsoft Azure TLS Issuing CA 06"
+          },
+          "common_name": "*.events.data.microsoft.com",
+          "subject_alternative_names": [
+            "*.events.data.microsoft.com",
+            "events.data.microsoft.com",
+            "*.pipe.aria.microsoft.com",
+            "pipe.skype.com",
+            "*.pipe.skype.com",
+            "*.mobile.events.data.microsoft.com",
+            "mobile.events.data.microsoft.com",
+            "*.events.data.msn.com",
+            "events.data.msn.com",
+            "*.events.data.msn.cn",
+            "events.data.msn.cn",
+            "oca.microsoft.com",
+            "watson.microsoft.com",
+            "*.vortex.data.microsoft.com",
+            "vortex.data.microsoft.com"
+          ],
+          "validity": {
+            "not_before": "Sep  8 21:29:54 2022 GMT",
+            "not_after": "Sep  3 21:29:54 2023 GMT",
+            "remaining": {
+              "days": 315,
+              "seconds": 17294
+            }
+          }
+        },
+        {
+          "issuer": {
+            "country": "US",
+            "organization": "DigiCert Inc",
+            "organizational_unit": "www.digicert.com",
+            "common_name": "DigiCert Global Root G2"
+          },
+          "common_name": "Microsoft Azure TLS Issuing CA 06",
+          "subject_alternative_names": [],
+          "validity": {
+            "not_before": "Jul 29 12:30:00 2020 GMT",
+            "not_after": "Jun 27 23:59:59 2024 GMT",
+            "remaining": {
+              "days": 613,
+              "seconds": 26299
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+```
+
 ## Design Goals
 
 1. Simplicity: Focus the agent's features on getting and exposing the data. Don't add features that could be done better by another application (e.g., log offload to the cloud).
@@ -121,7 +191,7 @@ Vesper monitors all TCP traffic to look for packet signatures that match TLS neg
 * Telemetry
   * Data flow statistics for TCP and UDP
   * Protocol-specific diagnostic information (e.g., TCP retransmits)
-  * DNS query and response data 
+  * DNS query and response data
   * TLS negotiation information
 * Configuration
   * Ignore traffic from specific sources/destinations (ideally by domain or CIDR)
