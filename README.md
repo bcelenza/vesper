@@ -8,6 +8,24 @@ A security-focused telemetry agent written in Rust using [eBPF](https://ebpf.io/
 
 The goal of vesper is to provide _transparency_ around what a host is doing, who it's talking to, and how it's communicating.
 
+All events emitted by Vesper will contain at least 3 entries:
+
+* `time`: The time the agent processed the event, in ISO 8601 format.
+* `type`: The type of event. See the types table below.
+* `event`: The event details.
+
+The event details will have at least one key that matches the event type.
+
+### Event Types
+
+| Type | Description |
+|-|-|
+| `DnsQuery` | A Domain Name System (DNS) query. |
+| `DnsResponse` | A Domain Name System (DNS) response. |
+| `TlsClientHello` | The [Client Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.2) portion of a Transport Layer Security (TLS) handshake. |
+| `TlsServerHello` | The [Server Hello](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.1.3) portion of a Transport Layer Security (TLS) handshake. |
+| `TlsCertificate` | The [Server Certificate](https://www.rfc-editor.org/rfc/rfc5246#section-7.4.2) portion of a Transport Layer Security (TLS) handshake (TLSv1.2 or lower only). |
+
 ### Examples
 
 #### DNS Query and Response
