@@ -4,7 +4,7 @@ use etherparse::SlicedPacket;
 use openssl::{x509::{X509, X509NameEntries}, nid::Nid, asn1::Asn1Time};
 use serde::Serialize;
 use tls_parser::{parse_tls_extensions, TlsClientHelloContents, TlsCipherSuite, TlsServerHelloContents, TlsCipherSuiteID, TlsCertificateContents};
-use tracing::{error, warn};
+use tracing::error;
 
 use super::{SocketAddress, EventError, SocketPair};
 
