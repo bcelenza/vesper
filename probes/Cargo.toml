@@ -23,3 +23,8 @@ path = "src/lib.rs"
 name = "network"
 path = "src/network/main.rs"
 required-features = ["probes"]
+
+[[bin]]
+name = "connection"
+path = "src/connection/main.rs"
+required-features = ["probes"]

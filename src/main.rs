@@ -1,4 +1,6 @@
 use clap::Parser;
+use vesper::listeners::connection::ConnectionConfig;
+use vesper::listeners::connection::ConnectionListener;
 use std::io;
 use std::process;
 use tokio::signal::ctrl_c;
@@ -56,6 +58,8 @@ async fn main() {
     let mut network_listener = NetworkListener::new(DnsProcessor::new(), TlsProcessor::new()).expect("could not load network probe");
     info!("Attaching to network interface {}", args.interface);
     network_listener.attach(NetworkConfig{ interface: args.interface.to_owned() }).expect("could not attach network probe to interface");
+    let mut connection_listener = ConnectionListener::new().expect("could not load connection probe");
+    connection_listener.attach(ConnectionConfig{}).expect("could not attach connection probe");
 
     // Monitor for CTRL+C.
     let ctrlc_fut = async {

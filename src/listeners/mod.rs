@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use redbpf::Error;
 
+pub mod connection;
 pub mod network;
 
 #[derive(Debug, Clone)]
