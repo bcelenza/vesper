@@ -99,7 +99,7 @@ pub fn filter_network(skb: SkBuff) -> SkBuffResult {
                         }
                     }
                 } else {
-                    printk!("Unexpected TCP frame receieved: expected=%u, received=%u", expected_frame.sequence_num, seq_num);
+                    printk!("Unexpected TCP frame receieved: expected=%u, received=%u", expected_frame.sequence_num, seq_num).expect("printk failed");
                 }
             } else {
                 // Maybe the start of a TLS message?
