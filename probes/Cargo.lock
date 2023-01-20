@@ -69,12 +69,12 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 [[package]]
 name = "bpf-sys"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e250a68cce6d347ca115c03e4aa0a629d81a04683323cb535e9025b64e92d65"
+source = "git+https://github.com/bcelenza/redbpf.git#8135b914e7522f5d9bc4dd5a945b6f72c051a4c6"
 dependencies = [
  "bindgen",
  "cc",
  "glob",
+ "libbpf-sys",
  "libc",
  "regex",
  "zero",
@@ -82,25 +82,29 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.11.0"
+version = "3.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1ad822118d20d2c234f427000d5acc36eabe1e29a348c89b63dd60b13f28e5d"
+checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
 
 [[package]]
 name = "cargo-bpf"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44936b01ed561d9e2b0ea42b84daf2a244e2dce728fc62743df65d0f42f628d5"
+source = "git+https://github.com/bcelenza/redbpf.git#8135b914e7522f5d9bc4dd5a945b6f72c051a4c6"
 dependencies = [
  "anyhow",
  "bindgen",
  "bpf-sys",
  "cfg-if",
  "glob",
+ "goblin",
  "lazy_static",
+ "libbpf-sys",
  "proc-macro2",
  "quote",
+ "regex",
+ "rustc_version 0.4.0",
  "rustversion",
+ "semver 1.0.16",
  "syn",
  "tempfile",
 ]
@@ -188,6 +192,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 
 [[package]]
+name = "goblin"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32401e89c6446dcd28185931a01b1093726d0356820ac744023e6850689bf926"
+dependencies = [
+ "log",
+ "plain",
+ "scroll",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,6 +250,16 @@ name = "lazycell"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
+
+[[package]]
+name = "libbpf-sys"
+version = "0.6.2+v0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c2c15bbeae2b87e3a63feea85a579272ed082f0f4d8f0e7968cc9a17e1b4d69"
+dependencies = [
+ "cc",
+ "pkg-config",
+]
 
 [[package]]
 name = "libc"
@@ -349,6 +374,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
 
 [[package]]
+name = "pkg-config"
+version = "0.3.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ac9a59f73473f1b8d852421e59e64809f025994837ef743615c6d0c5b305160"
+
+[[package]]
+name = "plain"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+
+[[package]]
 name = "probes"
 version = "0.1.0"
 dependencies = [
@@ -386,12 +423,11 @@ dependencies = [
 [[package]]
 name = "redbpf-macros"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2621721dd32b7c7be53e6abf6f276fb7b04b3e4a4653eacbfbb62b544e3a06e3"
+source = "git+https://github.com/bcelenza/redbpf.git#8135b914e7522f5d9bc4dd5a945b6f72c051a4c6"
 dependencies = [
  "proc-macro2",
  "quote",
- "rustc_version",
+ "rustc_version 0.3.3",
  "syn",
  "uuid",
 ]
@@ -399,8 +435,7 @@ dependencies = [
 [[package]]
 name = "redbpf-probes"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38925ab2d5908bba138f275520cd12e3674d95bb8cfd7a69406452dfcb1bf05d"
+source = "git+https://github.com/bcelenza/redbpf.git#8135b914e7522f5d9bc4dd5a945b6f72c051a4c6"
 dependencies = [
  "anyhow",
  "bindgen",
@@ -408,6 +443,7 @@ dependencies = [
  "cargo-bpf",
  "cty",
  "glob",
+ "libbpf-sys",
  "quote",
  "redbpf-macros",
  "syn",
@@ -472,7 +508,16 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0dfe2087c51c460008730de8b57e6a320782fbfb312e1f4d520e6c6fae155ee"
 dependencies = [
- "semver",
+ "semver 0.11.0",
+]
+
+[[package]]
+name = "rustc_version"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
+dependencies = [
+ "semver 1.0.16",
 ]
 
 [[package]]
@@ -488,6 +533,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4501abdff3ae82a1c1b477a17252eb69cee9e66eb915c1abaa4f44d873df9f09"
 
 [[package]]
+name = "scroll"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fda28d4b4830b807a8b43f7b0e6b5df875311b3e7621d84577188c175b6ec1ec"
+dependencies = [
+ "scroll_derive",
+]
+
+[[package]]
+name = "scroll_derive"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaaae8f38bb311444cfb7f1979af0bc9240d95795f75f9ceddf6a59b79ceffa0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "semver"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -495,6 +560,12 @@ checksum = "f301af10236f6df4160f7c3f04eec6dbc70ace82d23326abad5edee88801c6b6"
 dependencies = [
  "semver-parser",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58bc9567378fc7690d6b2addae4e60ac2eeea07becb2c64b9f218b53865cba2a"
 
 [[package]]
 name = "semver-parser"
