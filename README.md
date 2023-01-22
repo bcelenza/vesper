@@ -231,14 +231,17 @@ If you're on unbutu, you can install the required system libraries via:
 apt install build-essential \
     libclang-13-dev \
     libclang-common-13-dev \
+    libelf-dev \
     libssl-dev \
+    llvm-13 \
+    llvm-13-dev \
     pkg-config
 ```
 
 ### Getting Started
 
 1. Clone the repository.
-2. Run `make install`
+2. Run `make install` to install the cargo-bpf command line utility
 
 ### Build and Run
 
