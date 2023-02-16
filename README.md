@@ -1,4 +1,4 @@
-_This project is an educational endeavor and is not intended to be production ready. Interested in using this? [Let me know](mailto:bcelenza@gmail.com)._
+_This project is an educational endeavor and is not intended to be production ready. Interested in using this? [Let me know](mailto:bri@celenza.dev)._
 
 # Vesper
 
