@@ -9,7 +9,7 @@ members = [
 ]
 
 [dependencies]
-async-trait = "0.1.57"
+async-trait = "0.1.66"
 clap = { version = "3.2.20", features = ["derive"] }
 chrono = "0.4.22"
 dns-parser = { version = "0.8.0", features = ["with-serde"] }
