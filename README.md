@@ -1,4 +1,4 @@
-_This project is an educational endeavor and is not intended to be production ready. Interested in using this? [Let me know](mailto:bri@celenza.dev)._
+_This project is an educational endeavor and is not intended to be production ready. If you're interested in this type of tool, check out [Pulsar](https://github.com/exein-io/pulsar)._
 
 # Vesper
 
